@@ -1,11 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/message.dart';
 import '../services/crypto_service.dart';
 import '../services/storage_service.dart';
 import 'dart:async';
+import '../models/call.dart';
 
 class FirebaseMessageService {
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final DatabaseReference _database = FirebaseDatabase.instance.ref();
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -388,4 +391,107 @@ class FirebaseMessageService {
       return false;
     }
   }
+  static Future<bool> sendCallSignal({
+  required String receiverId,
+  required String callId,
+  required String type, // 'offer', 'answer', 'ice-candidate', 'decline', 'end'
+  required Map<String, dynamic> data,
+  required CallType callType,
+}) async {
+  try {
+    final currentUserId = await StorageService.getUserId();
+    if (currentUserId == null) return false;
+
+    // First, get the receiver's actual user ID from secure ID
+    String actualReceiverId = receiverId;
+    
+    // If receiverId looks like a secure ID, resolve it to actual user ID
+    if (!receiverId.startsWith('user_')) {
+      final receiverQuery = await _firestore
+          .collection('users')
+          .where('secureId', isEqualTo: receiverId)
+          .limit(1)
+          .get();
+
+      if (receiverQuery.docs.isNotEmpty) {
+        actualReceiverId = receiverQuery.docs.first.id;
+      }
+    }
+
+    final signalData = {
+      'senderId': currentUserId,
+      'receiverId': actualReceiverId,
+      'callId': callId,
+      'type': type,
+      'data': data,
+      'callType': callType.toString().split('.').last,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
+    await _firestore
+        .collection('call_signals')
+        .add(signalData);
+
+    return true;
+  } catch (e) {
+    print('Error sending call signal: $e');
+    return false;
+  }
+}
+
+static Stream<Map<String, dynamic>> listenForCallSignals() {
+  try {
+    return _firestore
+        .collection('call_signals')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final currentUserId = await StorageService.getUserId();
+      if (currentUserId == null) return <String, dynamic>{};
+
+      for (final doc in snapshot.docChanges) {
+        if (doc.type == DocumentChangeType.added) {
+          final data = doc.doc.data() as Map<String, dynamic>;
+          
+          // Check if this signal is for current user
+          if (data['receiverId'] == currentUserId) {
+            // Delete the signal after processing
+            doc.doc.reference.delete().catchError((e) {
+              print('Error deleting call signal: $e');
+            });
+            
+            return data;
+          }
+        }
+      }
+      
+      return <String, dynamic>{};
+    }).where((data) => data.isNotEmpty);
+  } catch (e) {
+    print('Error listening for call signals: $e');
+    return Stream.empty();
+  }
+}
+
+static Future<void> cleanupExpiredCallSignals() async {
+  try {
+    final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
+    
+    final query = await _firestore
+        .collection('call_signals')
+        .where('timestamp', isLessThan: Timestamp.fromDate(oneHourAgo))
+        .get();
+
+    final batch = _firestore.batch();
+    
+    for (final doc in query.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
+    print('Cleaned up ${query.docs.length} expired call signals');
+  } catch (e) {
+    print('Error cleaning up expired call signals: $e');
+  }
+}
 }

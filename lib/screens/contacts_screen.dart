@@ -13,10 +13,10 @@ class ContactsScreen extends StatefulWidget {
   final Function(String) onStartChat;
 
   const ContactsScreen({
-    Key? key,
+    super.key,
     required this.onContactAdded,
     required this.onStartChat,
-  }) : super(key: key);
+  });
 
   @override
   _ContactsScreenState createState() => _ContactsScreenState();

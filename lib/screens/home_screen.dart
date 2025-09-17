@@ -3,33 +3,35 @@ import 'dart:async';
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_message_service.dart';
 import '../services/storage_service.dart';
-import '../screens/chat_screen.dart';
-import '../screens/settings_screen.dart';
-import '../screens/contacts_screen.dart';
+import 'chat_screen.dart';
+import 'settings_screen.dart';
+import 'contacts_screen.dart';
+import '../models/call.dart';
 import '../utils/helpers.dart';
 import '../utils/constants.dart';
+import 'call_screen.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   String? _userSecureId;
   bool _isLoading = true;
   String _connectionStatus = 'Connecting...';
-  late TabController _tabController;
   Timer? _heartbeatTimer;
 
-  final List<String> _tabTitles = ['Chats', 'Contacts', 'Settings'];
+  final List<String> _tabTitles = ['Chats', 'Contacts', 'Calls', 'Settings'];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabController = TabController(length: 3, vsync: this);
     _initializeApp();
     _setupHeartbeat();
   }
@@ -37,7 +39,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _tabController.dispose();
     _heartbeatTimer?.cancel();
     super.dispose();
   }
@@ -67,22 +68,16 @@ class _HomeScreenState extends State<HomeScreen>
         _connectionStatus = 'Initializing...';
       });
 
-      // Check if user is already signed in
       final currentUser = FirebaseAuthService.getCurrentUser();
-
       if (currentUser == null) {
         setState(() {
           _connectionStatus = 'Signing in...';
         });
 
-        // Sign in anonymously
         final user = await FirebaseAuthService.signInAnonymously();
-        if (user == null) {
-          throw Exception('Failed to sign in');
-        }
+        if (user == null) throw Exception('Failed to sign in');
       }
 
-      // Get user secure ID
       final secureId = await StorageService.getUserSecureId();
 
       setState(() {
@@ -91,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen>
         _isLoading = false;
       });
 
-      // Clean up expired messages
       await FirebaseMessageService.cleanupExpiredMessages();
     } catch (e) {
       setState(() {
@@ -130,23 +124,6 @@ class _HomeScreenState extends State<HomeScreen>
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 0,
-        bottom: _isLoading
-            ? null
-            : TabBar(
-                controller: _tabController,
-                onTap: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                indicatorColor: Colors.white,
-                indicatorWeight: 3,
-                tabs: const [
-                  Tab(icon: Icon(Icons.chat), text: 'Chats'),
-                  Tab(icon: Icon(Icons.people), text: 'Contacts'),
-                  Tab(icon: Icon(Icons.settings), text: 'Settings'),
-                ],
-              ),
         actions: [
           if (!_isLoading) ...[
             Container(
@@ -217,22 +194,54 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
             )
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildChatsTab(),
-                ContactsScreen(
-                  onContactAdded: _onContactAdded,
-                  onStartChat: _onStartChat,
-                ),
-                SettingsScreen(
-                  userPublicId: _userSecureId ?? '',
-                  onClearData: _handleClearData,
-                  onRegenerateId: _handleRegenerateId,
-                ),
-              ],
-            ),
+          : _buildCurrentTab(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Chats',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Contacts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.phone),
+            label: 'Calls',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildCurrentTab() {
+    switch (_currentIndex) {
+      case 0:
+        return _buildChatsTab();
+      case 1:
+        return ContactsScreen(
+          onContactAdded: _onContactAdded,
+          onStartChat: _onStartChat,
+        );
+      case 2:
+        return _buildCallsTab();
+      case 3:
+        return SettingsScreen(
+          userPublicId: _userSecureId ?? '',
+          onClearData: _handleClearData,
+          onRegenerateId: _handleRegenerateId,
+        );
+      default:
+        return const Center(child: Text('Unknown tab'));
+    }
   }
 
   Widget _buildChatsTab() {
@@ -282,6 +291,25 @@ class _HomeScreenState extends State<HomeScreen>
           },
         );
       },
+    );
+  }
+
+  Widget _buildCallsTab() {
+    // TODO: Replace with real call history
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.phone, size: 80, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text("No calls yet"),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => _onStartCall("sampleUserId", CallType.audio),
+            child: const Text("Start Sample Call"),
+          ),
+        ],
+      ),
     );
   }
 
@@ -402,8 +430,8 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Regenerate'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Regenerate'),
           ),
         ],
       ),
@@ -437,7 +465,6 @@ class _HomeScreenState extends State<HomeScreen>
       await FirebaseAuthService.signOut();
       await StorageService.clearAllData();
 
-      // Restart the app initialization
       setState(() {
         _isLoading = true;
         _userSecureId = null;
@@ -450,7 +477,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _onContactAdded() {
-    // Refresh the UI
     setState(() {});
   }
 
@@ -459,6 +485,27 @@ class _HomeScreenState extends State<HomeScreen>
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(otherUserSecureId: otherUserSecureId),
+      ),
+    );
+  }
+
+  void _onStartCall(String otherUserSecureId, CallType callType) {
+    final call = Call(
+      id: 'some_unique_id',
+      callerId: _userSecureId!,
+      receiverId: otherUserSecureId,
+      type: callType,
+      status: CallStatus.outgoing,
+      timestamp: DateTime.now(),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CallScreen(
+          call: call,
+          isIncoming: false,
+        ),
       ),
     );
   }

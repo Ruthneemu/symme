@@ -9,8 +9,7 @@ import '../utils/helpers.dart';
 class ChatScreen extends StatefulWidget {
   final String otherUserSecureId;
 
-  const ChatScreen({Key? key, required this.otherUserSecureId})
-    : super(key: key);
+  const ChatScreen({super.key, required this.otherUserSecureId});
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -26,7 +25,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isSending = false;
   String? _otherUserId;
   String? _currentUserId; // Added current user ID state
-  bool _isOtherUserOnline = false;
+  final bool _isOtherUserOnline = false;
   int _disappearingTimer = 0;
   StreamSubscription<List<Message>>? _messagesSubscription;
 

@@ -10,6 +10,8 @@ void main() async {
 }
 
 class SecureChatApp extends StatelessWidget {
+  const SecureChatApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

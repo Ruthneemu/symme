@@ -89,4 +89,6 @@ class Helpers {
       ),
     );
   }
+
+  static formatDuration(int i) {}
 }

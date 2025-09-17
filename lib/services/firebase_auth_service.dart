@@ -68,7 +68,7 @@ class FirebaseAuthService {
       }
     } catch (e) {
       print('Error initializing user data: $e');
-      throw e;
+      rethrow;
     }
   }
 

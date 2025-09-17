@@ -157,8 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _getDisappearingTimerText() {
     if (_disappearingTimer == 0) return 'Off';
     if (_disappearingTimer < 3600) return '${_disappearingTimer ~/ 60} minutes';
-    if (_disappearingTimer < 86400)
+    if (_disappearingTimer < 86400) {
       return '${_disappearingTimer ~/ 3600} hours';
+    }
     return '${_disappearingTimer ~/ 86400} days';
   }
 

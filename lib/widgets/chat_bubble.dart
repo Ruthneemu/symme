@@ -7,11 +7,11 @@ class ChatBubble extends StatelessWidget {
   final bool showTimestamp;
 
   const ChatBubble({
-    Key? key,
+    super.key,
     required this.message,
     required this.isMe,
     this.showTimestamp = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +282,7 @@ class ChatBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
+              SizedBox(
                 height: 20,
                 child: Row(
                   children: List.generate(
