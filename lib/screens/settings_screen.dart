@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../widgets/identity_card.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
 import '../utils/constants.dart';
+import '../main.dart'; // for ThemeProvider
 
 class SettingsScreen extends StatefulWidget {
   final String userPublicId;
@@ -42,89 +44,123 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        IdentityCard(publicId: widget.userPublicId),
-        _buildSection(context, 'Privacy & Security', [
-          ListTile(
-            leading: const Icon(Icons.security),
-            title: const Text('End-to-End Encryption'),
-            subtitle: const Text('All messages are encrypted'),
-            trailing: const Icon(Icons.check_circle, color: Colors.green),
-          ),
-          ListTile(
-            leading: const Icon(Icons.timer),
-            title: const Text('Disappearing Messages'),
-            subtitle: Text(_getDisappearingTimerText()),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => _showDisappearingMessagesDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.auto_delete),
-            title: const Text('Auto-delete Expired'),
-            subtitle: const Text('Automatically clean up expired messages'),
-            trailing: Switch(
-              value: _autoDeleteExpired,
-              onChanged: (value) async {
-                setState(() {
-                  _autoDeleteExpired = value;
-                });
-                await StorageService.setAutoDeleteExpired(value);
-              },
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Settings"),
+        centerTitle: true,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          const SizedBox(height: 12),
+          IdentityCard(publicId: widget.userPublicId),
+
+          _buildSection(context, 'Appearance', [
+            ListTile(
+              leading: const Icon(Icons.dark_mode),
+              title: const Text("Dark Mode"),
+              subtitle: Text(
+                themeProvider.themeMode == ThemeMode.dark
+                    ? "Enabled"
+                    : "Disabled",
+              ),
+              trailing: Switch(
+                value: themeProvider.themeMode == ThemeMode.dark,
+                onChanged: (value) {
+                  themeProvider.toggleTheme(value);
+                },
+              ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.block),
-            title: const Text('Blocked Contacts'),
-            subtitle: const Text('Manage blocked users'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => _showBlockedContactsDialog(context),
-          ),
-        ]),
-        _buildSection(context, 'Identity', [
-          ListTile(
-            leading: const Icon(Icons.refresh),
-            title: const Text('Regenerate Secure ID'),
-            subtitle: const Text('Generate a new Secure ID'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => _showRegenerateIdDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.key),
-            title: const Text('Encryption Keys'),
-            subtitle: const Text('Rotate encryption keys'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => _showKeyRotationDialog(context),
-          ),
-        ]),
-        _buildSection(context, 'Application', [
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('About'),
-            subtitle: Text('Version ${AppConstants.appVersion}'),
-            onTap: () => _showAboutDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('Help & Support'),
-            subtitle: const Text('Get help using SecureChat'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => _showHelpDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.cleaning_services),
-            title: const Text('Clear Messages'),
-            subtitle: const Text('Delete all messages (keep contacts)'),
-            onTap: () => _showClearMessagesDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            title: const Text('Clear All Data'),
-            subtitle: const Text('Delete all messages and contacts'),
-            onTap: () => _showClearDataDialog(context),
-          ),
-        ]),
-      ],
+          ]),
+
+          _buildSection(context, 'Privacy & Security', [
+            ListTile(
+              leading: const Icon(Icons.security),
+              title: const Text('End-to-End Encryption'),
+              subtitle: const Text('All messages are encrypted'),
+              trailing: const Icon(Icons.check_circle, color: Colors.green),
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('Disappearing Messages'),
+              subtitle: Text(_getDisappearingTimerText()),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => _showDisappearingMessagesDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_delete),
+              title: const Text('Auto-delete Expired'),
+              subtitle: const Text('Automatically clean up expired messages'),
+              trailing: Switch(
+                value: _autoDeleteExpired,
+                onChanged: (value) async {
+                  setState(() {
+                    _autoDeleteExpired = value;
+                  });
+                  await StorageService.setAutoDeleteExpired(value);
+                },
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.block),
+              title: const Text('Blocked Contacts'),
+              subtitle: const Text('Manage blocked users'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => _showBlockedContactsDialog(context),
+            ),
+          ]),
+
+          _buildSection(context, 'Identity', [
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: const Text('Regenerate Secure ID'),
+              subtitle: const Text('Generate a new Secure ID'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => _showRegenerateIdDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.key),
+              title: const Text('Encryption Keys'),
+              subtitle: const Text('Rotate encryption keys'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => _showKeyRotationDialog(context),
+            ),
+          ]),
+
+          _buildSection(context, 'Application', [
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('About'),
+              subtitle: Text('Version ${AppConstants.appVersion}'),
+              onTap: () => _showAboutDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: const Text('Help & Support'),
+              subtitle: const Text('Get help using SecureChat'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => _showHelpDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cleaning_services),
+              title: const Text('Clear Messages'),
+              subtitle: const Text('Delete all messages (keep contacts)'),
+              onTap: () => _showClearMessagesDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Clear All Data'),
+              subtitle: const Text('Delete all messages and contacts'),
+              onTap: () => _showClearDataDialog(context),
+            ),
+          ]),
+        ],
+      ),
     );
   }
 
@@ -141,13 +177,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.deepPurple,
-              fontWeight: FontWeight.bold,
-            ),
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
           ),
         ),
         Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
           child: Column(children: children),
         ),
       ],

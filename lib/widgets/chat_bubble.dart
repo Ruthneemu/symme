@@ -15,12 +15,19 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bubbleColor = isMe
+        ? theme.colorScheme.primary
+        : theme.colorScheme.surfaceContainerHighest;
+    final textColor = isMe
+        ? Colors.white
+        : theme.colorScheme.onSurface;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
       child: Column(
-        crossAxisAlignment: isMe
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (showTimestamp)
             Container(
@@ -32,30 +39,31 @@ class ChatBubble extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: theme.colorScheme.surface.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     _formatTimestamp(message.timestamp),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
                   ),
                 ),
               ),
             ),
           Row(
-            mainAxisAlignment: isMe
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
+            mainAxisAlignment:
+                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMe) ...[
                 CircleAvatar(
                   radius: 12,
-                  backgroundColor: Colors.deepPurple,
-                  child: const Icon(
+                  backgroundColor: theme.colorScheme.primary,
+                  child: Icon(
                     Icons.person,
                     size: 16,
-                    color: Colors.white,
+                    color: theme.colorScheme.onPrimary,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -65,12 +73,10 @@ class ChatBubble extends StatelessWidget {
                   constraints: BoxConstraints(
                     maxWidth: MediaQuery.of(context).size.width * 0.75,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isMe ? Colors.deepPurple : Colors.grey[200],
+                    color: bubbleColor,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(18),
                       topRight: const Radius.circular(18),
@@ -81,7 +87,7 @@ class ChatBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildMessageContent(),
+                      _buildMessageContent(textColor, theme),
                       const SizedBox(height: 4),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -93,7 +99,7 @@ class ChatBubble extends StatelessWidget {
                               child: Icon(
                                 Icons.lock,
                                 size: 12,
-                                color: isMe ? Colors.white70 : Colors.grey[600],
+                                color: textColor.withOpacity(0.7),
                               ),
                             ),
                           if (message.expiresInSeconds != null)
@@ -102,14 +108,14 @@ class ChatBubble extends StatelessWidget {
                               child: Icon(
                                 Icons.timer,
                                 size: 12,
-                                color: isMe ? Colors.white70 : Colors.grey[600],
+                                color: textColor.withOpacity(0.7),
                               ),
                             ),
                           Text(
                             _formatTime(message.timestamp),
-                            style: TextStyle(
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: textColor.withOpacity(0.7),
                               fontSize: 11,
-                              color: isMe ? Colors.white70 : Colors.grey[600],
                             ),
                           ),
                           if (isMe) ...[
@@ -130,26 +136,24 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildMessageContent() {
+  Widget _buildMessageContent(Color textColor, ThemeData theme) {
     switch (message.type) {
       case MessageType.text:
-        return _buildTextMessage();
+        return _buildTextMessage(textColor);
       case MessageType.image:
-        return _buildImageMessage();
+        return _buildImageMessage(textColor, theme);
       case MessageType.file:
-        return _buildFileMessage();
+        return _buildFileMessage(textColor, theme);
       case MessageType.voice:
-        return _buildVoiceMessage();
+        return _buildVoiceMessage(textColor, theme);
       case MessageType.system:
-        return _buildSystemMessage();
+        return _buildSystemMessage(textColor);
     }
   }
 
-  Widget _buildTextMessage() {
-    // Check if message failed to decrypt
-    final isEncryptedError = message.content.contains(
-      '[Encrypted Message - Cannot Decrypt]',
-    );
+  Widget _buildTextMessage(Color textColor) {
+    final isEncryptedError =
+        message.content.contains('[Encrypted Message - Cannot Decrypt]');
 
     if (isEncryptedError) {
       return Column(
@@ -157,11 +161,8 @@ class ChatBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 16,
-                color: isMe ? Colors.white : Colors.red,
-              ),
+              Icon(Icons.error_outline,
+                  size: 16, color: isMe ? Colors.white : Colors.red),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -179,7 +180,7 @@ class ChatBubble extends StatelessWidget {
           Text(
             'This message requires a special decryption key',
             style: TextStyle(
-              color: isMe ? Colors.white70 : Colors.grey[600],
+              color: textColor.withOpacity(0.7),
               fontSize: 12,
             ),
           ),
@@ -190,13 +191,13 @@ class ChatBubble extends StatelessWidget {
     return SelectableText(
       message.content,
       style: TextStyle(
-        color: isMe ? Colors.white : Colors.black87,
+        color: textColor,
         fontSize: 16,
       ),
     );
   }
 
-  Widget _buildImageMessage() {
+  Widget _buildImageMessage(Color textColor, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -204,16 +205,17 @@ class ChatBubble extends StatelessWidget {
           width: 200,
           height: 150,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
+            color: theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.image, size: 64, color: Colors.grey),
+          child: Icon(Icons.image,
+              size: 64, color: theme.colorScheme.onSurface.withOpacity(0.6)),
         ),
         const SizedBox(height: 4),
         Text(
           'Image',
           style: TextStyle(
-            color: isMe ? Colors.white70 : Colors.grey[600],
+            color: textColor.withOpacity(0.7),
             fontSize: 12,
           ),
         ),
@@ -221,18 +223,19 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildFileMessage() {
+  Widget _buildFileMessage(Color textColor, ThemeData theme) {
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isMe ? Colors.white : Colors.deepPurple).withOpacity(0.2),
+            color: (isMe ? Colors.white : theme.colorScheme.primary)
+                .withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             Icons.insert_drive_file,
-            color: isMe ? Colors.white : Colors.deepPurple,
+            color: isMe ? Colors.white : theme.colorScheme.primary,
           ),
         ),
         const SizedBox(width: 8),
@@ -243,14 +246,14 @@ class ChatBubble extends StatelessWidget {
               Text(
                 'Document',
                 style: TextStyle(
-                  color: isMe ? Colors.white : Colors.black87,
+                  color: textColor,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 message.content,
                 style: TextStyle(
-                  color: isMe ? Colors.white70 : Colors.grey[600],
+                  color: textColor.withOpacity(0.7),
                   fontSize: 12,
                 ),
                 maxLines: 1,
@@ -263,18 +266,19 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildVoiceMessage() {
+  Widget _buildVoiceMessage(Color textColor, ThemeData theme) {
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isMe ? Colors.white : Colors.deepPurple).withOpacity(0.2),
+            color: (isMe ? Colors.white : theme.colorScheme.primary)
+                .withOpacity(0.2),
             shape: BoxShape.circle,
           ),
           child: Icon(
             Icons.play_arrow,
-            color: isMe ? Colors.white : Colors.deepPurple,
+            color: isMe ? Colors.white : theme.colorScheme.primary,
           ),
         ),
         const SizedBox(width: 8),
@@ -292,7 +296,7 @@ class ChatBubble extends StatelessWidget {
                       height: (index % 3 + 1) * 5.0,
                       margin: const EdgeInsets.symmetric(horizontal: 1),
                       decoration: BoxDecoration(
-                        color: isMe ? Colors.white70 : Colors.grey[400],
+                        color: textColor.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(1),
                       ),
                     ),
@@ -303,7 +307,7 @@ class ChatBubble extends StatelessWidget {
               Text(
                 '0:${message.content}',
                 style: TextStyle(
-                  color: isMe ? Colors.white70 : Colors.grey[600],
+                  color: textColor.withOpacity(0.7),
                   fontSize: 12,
                 ),
               ),
@@ -314,20 +318,16 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildSystemMessage() {
+  Widget _buildSystemMessage(Color textColor) {
     return Row(
       children: [
-        Icon(
-          Icons.info_outline,
-          size: 16,
-          color: isMe ? Colors.white : Colors.grey[600],
-        ),
+        Icon(Icons.info_outline, size: 16, color: textColor.withOpacity(0.7)),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
             message.content,
             style: TextStyle(
-              color: isMe ? Colors.white : Colors.grey[600],
+              color: textColor.withOpacity(0.7),
               fontSize: 14,
               fontStyle: FontStyle.italic,
             ),
@@ -354,11 +354,7 @@ class ChatBubble extends StatelessWidget {
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final messageDate = DateTime(
-      timestamp.year,
-      timestamp.month,
-      timestamp.day,
-    );
+    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
 
     if (messageDate == today) {
       return 'Today';

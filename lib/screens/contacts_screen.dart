@@ -7,6 +7,7 @@ import '../widgets/contact_list_item.dart';
 import '../widgets/qr_code_dialog.dart';
 import '../utils/helpers.dart';
 import '../utils/constants.dart';
+import '../utils/colors.dart';
 
 class ContactsScreen extends StatefulWidget {
   final VoidCallback onContactAdded;
@@ -62,8 +63,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
     }
 
     return Column(
@@ -73,6 +78,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           Container(
             margin: const EdgeInsets.all(16),
             child: Card(
+              color: theme.colorScheme.surface,
               elevation: 4,
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -81,12 +87,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.security, color: Colors.deepPurple),
+                        const Icon(Icons.security, color: AppColors.primary),
                         const SizedBox(width: 8),
                         Text(
                           'Your Secure ID',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ],
                     ),
@@ -95,29 +103,34 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!),
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withOpacity(0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               _userSecureId!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.copy),
+                            icon: const Icon(Icons.copy,
+                                color: AppColors.secondary),
                             onPressed: () => _copySecureId(),
                             tooltip: 'Copy ID',
                           ),
                           IconButton(
-                            icon: const Icon(Icons.qr_code),
+                            icon: const Icon(Icons.qr_code,
+                                color: AppColors.accent),
                             onPressed: () => _showQRCode(),
                             tooltip: 'Show QR Code',
                           ),
@@ -127,7 +140,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Share this ID with others to connect securely',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
                     ),
                   ],
                 ),
@@ -139,6 +154,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           child: Card(
+            color: theme.colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -146,8 +162,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 children: [
                   Text(
                     'Add New Contact',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -159,8 +176,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           icon: const Icon(Icons.person_add),
                           label: const Text('Add by ID'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.black,
                           ),
                         ),
                       ),
@@ -189,22 +206,21 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.people_outline,
-                        size: 80,
-                        color: Colors.grey[400],
-                      ),
+                      Icon(Icons.people_outline,
+                          size: 80,
+                          color: theme.colorScheme.onSurface.withOpacity(0.3)),
                       const SizedBox(height: 16),
                       Text(
                         AppStrings.noContactsYet,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(color: Colors.grey[600]),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         AppStrings.useQrOrInvite,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[500],
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -217,6 +233,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   itemBuilder: (context, index) {
                     final contact = _contacts[index];
                     return Card(
+                      color: theme.colorScheme.surface,
                       margin: const EdgeInsets.symmetric(vertical: 2),
                       child: ContactListItem(
                         contact: contact,
@@ -252,10 +269,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
     _secureIdController.clear();
     _nameController.clear();
 
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add Contact'),
+        backgroundColor: theme.colorScheme.surface,
+        title: Text('Add Contact',
+            style: TextStyle(color: theme.colorScheme.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -284,10 +305,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: TextStyle(color: theme.colorScheme.onSurface)),
           ),
           ElevatedButton(
             onPressed: () => _addContact(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.black,
+            ),
             child: const Text('Add Contact'),
           ),
         ],
@@ -296,10 +322,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showScanQRDialog() {
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Scan QR Code'),
+        backgroundColor: theme.colorScheme.surface,
+        title: Text('Scan QR Code',
+            style: TextStyle(color: theme.colorScheme.onSurface)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -307,18 +337,21 @@ class _ContactsScreenState extends State<ContactsScreen> {
               height: 200,
               width: 200,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
+                border: Border.all(color: theme.colorScheme.outline),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.qr_code_scanner, size: 64, color: Colors.grey),
-                    SizedBox(height: 8),
+                    Icon(Icons.qr_code_scanner,
+                        size: 64,
+                        color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                    const SizedBox(height: 8),
                     Text(
                       'QR Scanner\nComing Soon!',
                       textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ],
                 ),
@@ -329,7 +362,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text('Close',
+                style: TextStyle(color: theme.colorScheme.onSurface)),
           ),
         ],
       ),
@@ -355,14 +389,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
       return;
     }
 
-    // Check if contact already exists
     if (_contacts.any((c) => c.publicId == secureId)) {
       Helpers.showSnackBar(context, 'Contact already exists');
       return;
     }
 
     try {
-      // Verify if the Secure ID exists and is active
       final userData = await FirebaseAuthService.getUserBySecureId(secureId);
 
       if (userData == null) {
@@ -370,7 +402,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
         return;
       }
 
-      // Add contact locally
       final newContact = Contact(
         publicId: secureId,
         name: name.isNotEmpty ? name : 'User ${secureId.substring(0, 4)}',
@@ -382,8 +413,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
       Navigator.pop(context);
       setState(() {});
-
       widget.onContactAdded();
+
       Helpers.showSnackBar(context, AppStrings.contactAdded);
     } catch (e) {
       Helpers.showSnackBar(context, 'Failed to add contact: ${e.toString()}');
@@ -391,17 +422,22 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showCallDialog(Contact contact) {
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Call ${contact.name}'),
+        backgroundColor: theme.colorScheme.surface,
+        title: Text('Call ${contact.name}',
+            style: TextStyle(color: theme.colorScheme.onSurface)),
         content: const Text(
           'Voice and video calling features are coming soon!',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: Text('OK',
+                style: TextStyle(color: theme.colorScheme.onSurface)),
           ),
         ],
       ),

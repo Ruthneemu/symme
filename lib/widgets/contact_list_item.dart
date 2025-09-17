@@ -20,6 +20,10 @@ class ContactListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.colorScheme.onSurface;
+    final subtleColor = theme.colorScheme.onSurface.withOpacity(0.6);
+
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: Helpers.getColorFromId(contact.publicId),
@@ -33,7 +37,10 @@ class ContactListItem extends StatelessWidget {
       ),
       title: Text(
         contact.name,
-        style: const TextStyle(fontWeight: FontWeight.w500),
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: textColor,
+        ),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +50,7 @@ class ContactListItem extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontFamily: 'monospace',
-              color: Colors.grey[600],
+              color: subtleColor,
             ),
           ),
           if (contact.isOnline)
@@ -52,22 +59,28 @@ class ContactListItem extends StatelessWidget {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondary,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Text(
+                Text(
                   'Online',
-                  style: TextStyle(fontSize: 12, color: Colors.green),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.secondary,
+                  ),
                 ),
               ],
             )
           else if (contact.lastSeen != null)
             Text(
               'Last seen: ${contact.lastSeen}',
-              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 12,
+                color: subtleColor,
+              ),
             ),
         ],
       ),
@@ -76,12 +89,12 @@ class ContactListItem extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.call),
+                  icon: Icon(Icons.call, color: theme.colorScheme.primary),
                   onPressed: onCall,
                   tooltip: 'Call',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.message),
+                  icon: Icon(Icons.message, color: theme.colorScheme.primary),
                   onPressed: onMessage,
                   tooltip: 'Message',
                 ),

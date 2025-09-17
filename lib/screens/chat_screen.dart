@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:symmeapp/utils/colors.dart';
 import 'dart:async';
 import '../models/message.dart';
 import '../services/firebase_message_service.dart';
@@ -24,7 +25,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _isSending = false;
   String? _otherUserId;
-  String? _currentUserId; // Added current user ID state
+  String? _currentUserId;
   final bool _isOtherUserOnline = false;
   int _disappearingTimer = 0;
   StreamSubscription<List<Message>>? _messagesSubscription;
@@ -35,7 +36,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initializeChat();
     _loadDisappearingTimer();
-    _loadCurrentUser(); // Load current user ID
+    _loadCurrentUser();
   }
 
   @override
@@ -52,9 +53,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       final userId = await StorageService.getUserId();
       if (mounted) {
-        setState(() {
-          _currentUserId = userId;
-        });
+        setState(() => _currentUserId = userId);
       }
     } catch (e) {
       print('Error loading current user: $e');
@@ -63,27 +62,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeChat() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
 
-      // Get other user's info from secure ID by trying to send a test message
-      // This will validate the secure ID exists and get the user ID
-      // For now, we'll use the secure ID as a placeholder and let the service handle it
       setState(() {
-        _otherUserId =
-            widget.otherUserSecureId; // Temporary - will be resolved in service
+        _otherUserId = widget.otherUserSecureId;
         _isLoading = false;
       });
 
-      // Listen to messages
       _listenToMessages();
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       if (mounted) {
-        Helpers.showSnackBar(context, 'Failed to load chat: ${e.toString()}');
+        Helpers.showSnackBar(context, 'Failed to load chat: $e');
       }
     }
   }
@@ -92,34 +82,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_otherUserId == null) return;
 
     _messagesSubscription = FirebaseMessageService.getMessages(_otherUserId!)
-        .listen(
-          (messages) {
-            if (mounted) {
-              setState(() {
-                _messages = messages;
-              });
-              _scrollToBottom();
-            }
-          },
-          onError: (error) {
-            print('Error listening to messages: $error');
-            if (mounted) {
-              Helpers.showSnackBar(
-                context,
-                'Error loading messages: ${error.toString()}',
-              );
-            }
-          },
-        );
+        .listen((messages) {
+      if (mounted) {
+        setState(() => _messages = messages);
+        _scrollToBottom();
+      }
+    }, onError: (error) {
+      print('Error listening to messages: $error');
+      if (mounted) {
+        Helpers.showSnackBar(context, 'Error loading messages: $error');
+      }
+    });
   }
 
   Future<void> _loadDisappearingTimer() async {
     try {
       final timer = await StorageService.getDisappearingMessageTimer();
       if (mounted) {
-        setState(() {
-          _disappearingTimer = timer;
-        });
+        setState(() => _disappearingTimer = timer);
       }
     } catch (e) {
       print('Error loading disappearing timer: $e');
@@ -144,9 +124,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isSending) return;
 
-    setState(() {
-      _isSending = true;
-    });
+    setState(() => _isSending = true);
 
     try {
       final success = await FirebaseMessageService.sendMessage(
@@ -160,19 +138,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _messageController.clear();
         _scrollToBottom();
       } else {
-        if (mounted) {
-          Helpers.showSnackBar(context, 'Failed to send message');
-        }
+        Helpers.showSnackBar(context, 'Failed to send message');
       }
     } catch (e) {
-      if (mounted) {
-        Helpers.showSnackBar(context, 'Error sending message: ${e.toString()}');
-      }
+      Helpers.showSnackBar(context, 'Error sending message: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
+        setState(() => _isSending = false);
       }
     }
   }
@@ -181,11 +153,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Disappearing Messages'),
+        backgroundColor: AppColors.backgroundLight,
+        title: const Text('Disappearing Messages',
+            style: TextStyle(color: AppColors.primary)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Set timer for new messages:'),
+            const Text('Set timer for new messages:',
+                style: TextStyle(color: AppColors.greyLight)),
             const SizedBox(height: 16),
             ...[
               {'label': 'Off', 'value': 0},
@@ -195,13 +170,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               {'label': '30 Days', 'value': 2592000},
             ].map(
               (option) => RadioListTile<int>(
-                title: Text(option['label'] as String),
+                title: Text(option['label'] as String,
+                    style: const TextStyle(color: AppColors.greyLight)),
                 value: option['value'] as int,
                 groupValue: _disappearingTimer,
+                activeColor: AppColors.accent,
                 onChanged: (value) {
-                  setState(() {
-                    _disappearingTimer = value ?? 0;
-                  });
+                  setState(() => _disappearingTimer = value ?? 0);
                   Navigator.pop(context);
                   _saveDisappearingTimer();
                 },
@@ -212,7 +187,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child:
+                const Text('Cancel', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -232,20 +208,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         }
       }
 
-      if (mounted) {
-        Helpers.showSnackBar(context, 'Disappearing messages: $timerText');
-      }
+      Helpers.showSnackBar(context, 'Disappearing messages: $timerText');
     } catch (e) {
-      if (mounted) {
-        Helpers.showSnackBar(context, 'Error saving timer: ${e.toString()}');
-      }
+      Helpers.showSnackBar(context, 'Error saving timer: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
+        backgroundColor: AppColors.backgroundLight,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -255,52 +229,47 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'monospace',
+                color: AppColors.primary,
               ),
             ),
             if (_isOtherUserOnline)
-              const Text(
-                'Online',
-                style: TextStyle(fontSize: 12, color: Colors.green),
-              ),
+              const Text('Online',
+                  style: TextStyle(fontSize: 12, color: AppColors.success)),
           ],
         ),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
         actions: [
           PopupMenuButton<String>(
+            color: AppColors.backgroundLight,
+            icon: const Icon(Icons.more_vert, color: AppColors.primary),
             onSelected: (value) {
-              switch (value) {
-                case 'disappearing':
-                  _showDisappearingMessagesDialog();
-                  break;
-                case 'clear_chat':
-                  _showClearChatDialog();
-                  break;
+              if (value == 'disappearing') {
+                _showDisappearingMessagesDialog();
+              } else if (value == 'clear_chat') {
+                _showClearChatDialog();
               }
             },
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'disappearing',
                 child: ListTile(
-                  leading: Icon(
-                    Icons.timer,
-                    color: _disappearingTimer > 0 ? Colors.blue : null,
-                  ),
-                  title: const Text('Disappearing Messages'),
+                  leading:
+                      const Icon(Icons.timer, color: AppColors.accent),
+                  title: const Text('Disappearing Messages',
+                      style: TextStyle(color: AppColors.greyLight)),
                   subtitle: Text(
                     _disappearingTimer > 0
                         ? _getTimerText(_disappearingTimer)
                         : 'Off',
+                    style: const TextStyle(color: AppColors.greyDark),
                   ),
-                  contentPadding: EdgeInsets.zero,
                 ),
               ),
               const PopupMenuItem(
                 value: 'clear_chat',
                 child: ListTile(
-                  leading: Icon(Icons.delete_outline),
-                  title: Text('Clear Chat'),
-                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.delete_outline, color: AppColors.error),
+                  title: Text('Clear Chat',
+                      style: TextStyle(color: AppColors.greyLight)),
                 ),
               ),
             ],
@@ -308,25 +277,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary))
           : Column(
               children: [
                 if (_disappearingTimer > 0)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
-                    color: Colors.blue.withOpacity(0.1),
+                    color: AppColors.accent.withOpacity(0.1),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.timer, size: 16, color: Colors.blue),
+                        const Icon(Icons.timer,
+                            size: 16, color: AppColors.accent),
                         const SizedBox(width: 4),
                         Text(
                           'Messages disappear after ${_getTimerText(_disappearingTimer)}',
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue,
-                          ),
+                              fontSize: 12, color: AppColors.accent),
                         ),
                       ],
                     ),
@@ -334,11 +303,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 Expanded(child: _buildMessagesList()),
                 Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
+                    color: AppColors.backgroundLight,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 6,
                         offset: const Offset(0, -2),
                       ),
                     ],
@@ -355,18 +324,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'This chat is end-to-end encrypted',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Send your first message to start the conversation',
-              style: TextStyle(color: Colors.grey[500], fontSize: 14),
-            ),
+          children: const [
+            Icon(Icons.lock, size: 64, color: AppColors.greyDark),
+            SizedBox(height: 16),
+            Text('This chat is end-to-end encrypted',
+                style: TextStyle(color: AppColors.greyLight, fontSize: 16)),
+            SizedBox(height: 8),
+            Text('Send your first message to start the conversation',
+                style: TextStyle(color: AppColors.greyDark, fontSize: 14)),
           ],
         ),
       );
@@ -378,7 +343,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
-        // Fixed: Use the actual current user ID from state
         final isMe = message.senderId == _currentUserId;
 
         return ChatBubble(
@@ -392,14 +356,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   bool _shouldShowTimestamp(int index) {
     if (index == 0) return true;
-
-    final currentMessage = _messages[index];
-    final previousMessage = _messages[index - 1];
-
-    final timeDifference = currentMessage.timestamp.difference(
-      previousMessage.timestamp,
-    );
-    return timeDifference.inMinutes > 30;
+    final current = _messages[index];
+    final previous = _messages[index - 1];
+    return current.timestamp.difference(previous.timestamp).inMinutes > 30;
   }
 
   Widget _buildMessageInput() {
@@ -410,9 +369,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: AppColors.backgroundDark,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: AppColors.greyDark),
               ),
               child: Row(
                 children: [
@@ -421,8 +380,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     child: TextField(
                       controller: _messageController,
                       focusNode: _messageFocusNode,
+                      style: const TextStyle(color: AppColors.greyLight),
                       decoration: const InputDecoration(
                         hintText: 'Type a message...',
+                        hintStyle: TextStyle(color: AppColors.greyDark),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -430,21 +391,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       onSubmitted: (_) => _sendMessage(),
                       maxLines: null,
                       maxLength: 4096,
-                      buildCounter:
-                          (
-                            context, {
-                            required currentLength,
-                            maxLength,
-                            required isFocused,
-                          }) {
-                            return null; // Hide counter
-                          },
+                      buildCounter: (_, {required currentLength, maxLength, required isFocused}) => null,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.attach_file),
-                    onPressed: () => _showAttachmentOptions(),
-                    color: Colors.grey[600],
+                    icon: const Icon(Icons.attach_file, color: AppColors.accent),
+                    onPressed: _showAttachmentOptions,
                   ),
                 ],
               ),
@@ -453,7 +405,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           const SizedBox(width: 8),
           Container(
             decoration: const BoxDecoration(
-              color: Colors.deepPurple,
+              gradient: LinearGradient(
+                colors: AppColors.gradient1,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -462,13 +418,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.send),
+                          strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                  : const Icon(Icons.send, color: Colors.white),
               onPressed: _isSending ? null : _sendMessage,
-              color: Colors.white,
             ),
           ),
         ],
@@ -478,35 +430,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _showAttachmentOptions() {
     showModalBottomSheet(
+      backgroundColor: AppColors.backgroundLight,
       context: context,
-      builder: (context) => Container(
+      builder: (context) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Attachment Options',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text('Attachment Options',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary)),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildAttachmentOption(
-                  icon: Icons.camera_alt,
-                  label: 'Camera',
-                  onTap: () => _handleAttachment('camera'),
-                ),
-                _buildAttachmentOption(
-                  icon: Icons.photo,
-                  label: 'Gallery',
-                  onTap: () => _handleAttachment('gallery'),
-                ),
-                _buildAttachmentOption(
-                  icon: Icons.insert_drive_file,
-                  label: 'File',
-                  onTap: () => _handleAttachment('file'),
-                ),
+                _buildAttachmentOption(Icons.camera_alt, 'Camera', 'camera'),
+                _buildAttachmentOption(Icons.photo, 'Gallery', 'gallery'),
+                _buildAttachmentOption(Icons.insert_drive_file, 'File', 'file'),
               ],
             ),
             const SizedBox(height: 16),
@@ -516,13 +458,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildAttachmentOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildAttachmentOption(IconData icon, String label, String type) {
     return InkWell(
-      onTap: onTap,
+      onTap: () => _handleAttachment(type),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -531,13 +469,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.withOpacity(0.1),
+                color: AppColors.secondary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 32, color: Colors.deepPurple),
+              child: Icon(icon, size: 32, color: AppColors.secondary),
             ),
             const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontSize: 12)),
+            Text(label, style: const TextStyle(color: AppColors.greyLight)),
           ],
         ),
       ),
@@ -546,32 +484,34 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _handleAttachment(String type) {
     Navigator.pop(context);
-
-    // For now, just show a placeholder message
-    if (mounted) {
-      Helpers.showSnackBar(context, '$type attachment coming soon!');
-    }
+    Helpers.showSnackBar(context, '$type attachment coming soon!');
   }
 
   void _showClearChatDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Chat'),
+        backgroundColor: AppColors.backgroundLight,
+        title: const Text('Clear Chat',
+            style: TextStyle(color: AppColors.error)),
         content: const Text(
           'This will delete all messages in this chat. This action cannot be undone.',
+          style: TextStyle(color: AppColors.greyLight),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child:
+                const Text('Cancel', style: TextStyle(color: AppColors.greyDark)),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(context);
               _clearChat();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete All'),
           ),
         ],
@@ -581,28 +521,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _clearChat() async {
     if (_otherUserId == null) {
-      if (mounted) {
-        Helpers.showSnackBar(context, 'Cannot clear chat: missing user ID');
-      }
+      Helpers.showSnackBar(context, 'Cannot clear chat: missing user ID');
       return;
     }
 
     try {
       final success = await FirebaseMessageService.clearChat(_otherUserId!);
-      if (mounted) {
-        if (success) {
-          Helpers.showSnackBar(context, 'Chat cleared successfully');
-          setState(() {
-            _messages.clear();
-          });
-        } else {
-          Helpers.showSnackBar(context, 'Failed to clear chat');
-        }
+      if (success) {
+        Helpers.showSnackBar(context, 'Chat cleared successfully');
+        setState(() => _messages.clear());
+      } else {
+        Helpers.showSnackBar(context, 'Failed to clear chat');
       }
     } catch (e) {
-      if (mounted) {
-        Helpers.showSnackBar(context, 'Failed to clear chat: ${e.toString()}');
-      }
+      Helpers.showSnackBar(context, 'Failed to clear chat: $e');
     }
   }
 
