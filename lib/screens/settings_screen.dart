@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:symme/screens/chat_screen.dart';
+import 'package:symme/screens/qr_code_screen.dart';
 import '../widgets/identity_card.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
@@ -59,7 +61,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           const SizedBox(height: 12),
           IdentityCard(publicId: widget.userPublicId),
-
           _buildSection(context, 'Appearance', [
             ListTile(
               leading: const Icon(Icons.dark_mode),
@@ -77,13 +78,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ]),
-
           _buildSection(context, 'Privacy & Security', [
-            ListTile(
-              leading: const Icon(Icons.security),
-              title: const Text('End-to-End Encryption'),
-              subtitle: const Text('All messages are encrypted'),
-              trailing: const Icon(Icons.check_circle, color: Colors.green),
+            const ListTile(
+              leading: Icon(Icons.security),
+              title: Text('End-to-End Encryption'),
+              subtitle: Text('All messages are encrypted'),
+              trailing: Icon(Icons.check_circle, color: Colors.green),
             ),
             ListTile(
               leading: const Icon(Icons.timer),
@@ -114,8 +114,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _showBlockedContactsDialog(context),
             ),
           ]),
-
           _buildSection(context, 'Identity', [
+            ListTile(
+              leading: const Icon(Icons.qr_code),
+              title: const Text('Share Secure ID'),
+              subtitle: const Text('Share or scan a Secure ID'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => _navigateToQrScreen(context),
+            ),
             ListTile(
               leading: const Icon(Icons.refresh),
               title: const Text('Regenerate Secure ID'),
@@ -131,12 +137,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _showKeyRotationDialog(context),
             ),
           ]),
-
           _buildSection(context, 'Application', [
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('About'),
-              subtitle: Text('Version ${AppConstants.appVersion}'),
+              subtitle: const Text('Version ${AppConstants.appVersion}'),
               onTap: () => _showAboutDialog(context),
             ),
             ListTile(
@@ -177,9 +182,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         Card(
@@ -191,6 +196,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(children: children),
         ),
       ],
+    );
+  }
+
+  Future<void> _navigateToQrScreen(BuildContext context) async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => QrCodeScreen(publicId: widget.userPublicId),
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      _handleScannedCode(result);
+    }
+  }
+
+  void _handleScannedCode(String code) {
+    Helpers.showConfirmDialog(
+      context: context,
+      title: 'Start a new chat?',
+      content: 'Do you want to start a new chat with $code?',
+      onConfirm: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(otherUserSecureId: code),
+          ),
+        );
+      },
     );
   }
 

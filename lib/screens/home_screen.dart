@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:symmeapp/utils/colors.dart';
-import 'package:symmeapp/utils/helpers.dart';
+import 'package:symme/utils/colors.dart';
+import 'package:symme/utils/helpers.dart';
+import 'package:symme/widgets/circles_tab.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_message_service.dart';
 import '../services/storage_service.dart';
@@ -22,8 +23,7 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   String? _userSecureId;
   bool _isLoading = true;
@@ -91,8 +91,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _setupHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer =
-        Timer.periodic(const Duration(minutes: 5), (_) => FirebaseAuthService.updateLastSeen());
+    _heartbeatTimer = Timer.periodic(const Duration(minutes: 5),
+        (_) => FirebaseAuthService.updateLastSeen());
   }
 
   void _updateOnlineStatus(bool isOnline) {
@@ -136,13 +136,15 @@ class _HomeScreenState extends State<HomeScreen>
       case 0:
         return ChatTab(onStartChat: _onStartChat);
       case 1:
+        return CirclesTab(userSecureId: _userSecureId ?? '');
+      case 2:
         return ContactsScreen(
           onContactAdded: _onContactAdded,
           onStartChat: _onStartChat,
         );
-      case 2:
-        return const CallsTab();
       case 3:
+        return const CallsTab();
+      case 4:
         return SettingsScreen(
           userPublicId: _userSecureId ?? '',
           onClearData: _handleClearData,

@@ -20,10 +20,10 @@ class IdentityCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CircleAvatar(
+              const CircleAvatar(
                 backgroundColor: Colors.deepPurple,
                 radius: 24,
-                child: const Icon(Icons.person, color: Colors.white, size: 28),
+                child: Icon(Icons.person, color: Colors.white, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(

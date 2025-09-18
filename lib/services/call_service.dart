@@ -187,7 +187,7 @@ class CallService {
   }
 
   static Stream<List<Call>> getCallHistory() {
-    return Stream.empty(); // Implement based on your needs
+    return const Stream.empty(); // Implement based on your needs
   }
 
   static Future<List<Call>> getRecentCalls({int limit = 50}) async {

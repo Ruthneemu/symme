@@ -1,10 +1,10 @@
 {
   "roots": [
-    "symmeapp"
+    "symme"
   ],
   "packages": [
     {
-      "name": "symmeapp",
+      "name": "symme",
       "version": "1.0.0+1",
       "dependencies": [
         "asn1lib",
@@ -18,9 +18,11 @@
         "firebase_messaging",
         "flutter",
         "flutter_webrtc",
+        "mobile_scanner",
         "permission_handler",
         "pointycastle",
         "provider",
+        "qr_flutter",
         "ringtone_player",
         "shared_preferences",
         "vibration",
@@ -54,6 +56,26 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "mobile_scanner",
+      "version": "7.0.1",
+      "dependencies": [
+        "collection",
+        "flutter",
+        "flutter_web_plugins",
+        "meta",
+        "plugin_platform_interface",
+        "web"
+      ]
+    },
+    {
+      "name": "qr_flutter",
+      "version": "4.1.0",
+      "dependencies": [
+        "flutter",
+        "qr"
       ]
     },
     {
@@ -329,6 +351,32 @@
       ]
     },
     {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "plugin_platform_interface",
+      "version": "2.1.8",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "qr",
+      "version": "3.0.2",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
       "name": "nested",
       "version": "1.0.0",
       "dependencies": [
@@ -415,20 +463,8 @@
       ]
     },
     {
-      "name": "plugin_platform_interface",
-      "version": "2.1.8",
-      "dependencies": [
-        "meta"
-      ]
-    },
-    {
       "name": "webrtc_interface",
       "version": "1.3.0",
-      "dependencies": []
-    },
-    {
-      "name": "web",
-      "version": "1.1.1",
       "dependencies": []
     },
     {
@@ -745,15 +781,8 @@
       ]
     },
     {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
-      "dependencies": [
-        "flutter"
-      ]
-    },
-    {
       "name": "device_info_plus",
-      "version": "11.5.0",
+      "version": "10.1.2",
       "dependencies": [
         "device_info_plus_platform_interface",
         "ffi",
@@ -868,10 +897,9 @@
     },
     {
       "name": "win32_registry",
-      "version": "2.1.0",
+      "version": "1.1.5",
       "dependencies": [
         "ffi",
-        "meta",
         "win32"
       ]
     },

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:symmeapp/utils/colors.dart';
+import 'package:symme/utils/colors.dart';
 import '../services/firebase_message_service.dart';
 import '../utils/helpers.dart';
 
@@ -44,119 +44,62 @@ class _ChatTabState extends State<ChatTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
-    }
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
+          : _chatRooms.isEmpty
+              ? _buildEmptyState()
+              : _buildChatList(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showStartChatDialog,
+        backgroundColor: AppColors.primary,
+        tooltip: 'Start New Chat',
+        child: const Icon(Icons.add_comment, color: Colors.white),
+      ),
+    );
+  }
 
-    if (_chatRooms.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.chat_outlined,
-              size: 80,
-              color: AppColors.greyDark,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No conversations yet',
-              style: TextStyle(
-                fontSize: 20,
-                color: AppColors.greyLight,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Start a new chat by adding a contact\nor entering a secure ID',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: AppColors.greyDark),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _showStartChatDialog,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-              icon: const Icon(Icons.add_comment),
-              label: const Text('Start New Chat'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Search/Add chat header
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundLight,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.greyDark),
-                  ),
-                  child: TextField(
-                    style: const TextStyle(color: AppColors.greyLight),
-                    decoration: const InputDecoration(
-                      hintText: 'Search chats or enter secure ID...',
-                      hintStyle: TextStyle(color: AppColors.greyDark),
-                      prefixIcon: Icon(Icons.search, color: AppColors.greyDark),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: _handleSearchOrStartChat,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: AppColors.gradient1,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  onPressed: _showStartChatDialog,
-                  icon: const Icon(Icons.add, color: Colors.white),
-                ),
-              ),
-            ],
+  Widget _buildEmptyState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 80,
+            color: AppColors.greyDark,
           ),
-        ),
-
-        // Chat rooms list
-        Expanded(
-          child: ListView.builder(
-            itemCount: _chatRooms.length,
-            itemBuilder: (context, index) {
-              final chatRoom = _chatRooms[index];
-              return _buildChatRoomItem(chatRoom);
-            },
+          SizedBox(height: 16),
+          Text(
+            'No Chats Yet',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppColors.greyLight,
+            ),
           ),
-        ),
-      ],
+          SizedBox(height: 8),
+          Text(
+            'Tap the button below to start a new conversation.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: AppColors.greyDark),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatList() {
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 80), // Space for the FAB
+      itemCount: _chatRooms.length,
+      itemBuilder: (context, index) {
+        final chatRoom = _chatRooms[index];
+        return _buildChatRoomItem(chatRoom);
+      },
     );
   }
 
@@ -265,38 +208,6 @@ class _ChatTabState extends State<ChatTab> {
     );
   }
 
-  void _handleSearchOrStartChat(String input) {
-    final trimmedInput = input.trim();
-    if (trimmedInput.isEmpty) return;
-
-    // Check if it looks like a secure ID (12 characters, uppercase, alphanumeric)
-    if (_isValidSecureId(trimmedInput)) {
-      widget.onStartChat(trimmedInput);
-    } else {
-      // Search existing chats
-      final matchingChats = _chatRooms.where((chat) {
-        final displayName = chat['displayName'] as String? ?? '';
-        final lastMessage = chat['lastMessage'] as String? ?? '';
-        return displayName.toLowerCase().contains(trimmedInput.toLowerCase()) ||
-            lastMessage.toLowerCase().contains(trimmedInput.toLowerCase());
-      }).toList();
-
-      if (matchingChats.isNotEmpty) {
-        final firstMatch = matchingChats.first;
-        final secureId = firstMatch['otherUserSecureId'] as String? ?? '';
-        if (secureId.isNotEmpty) {
-          widget.onStartChat(secureId);
-        }
-      } else {
-        Helpers.showSnackBar(context, 'No matching chats found');
-      }
-    }
-  }
-
-  bool _isValidSecureId(String id) {
-    return RegExp(r'^[A-Z0-9]{12}$').hasMatch(id);
-  }
-
   void _showStartChatDialog() {
     final TextEditingController controller = TextEditingController();
 
@@ -371,6 +282,10 @@ class _ChatTabState extends State<ChatTab> {
     );
   }
 
+  bool _isValidSecureId(String id) {
+    return RegExp(r'^[A-Z0-9]{12}$').hasMatch(id);
+  }
+
   void _showChatOptions(Map<String, dynamic> chatRoom) {
     final otherUserSecureId = chatRoom['otherUserSecureId'] as String? ?? '';
     final displayName = chatRoom['displayName'] as String? ?? otherUserSecureId;
@@ -414,9 +329,9 @@ class _ChatTabState extends State<ChatTab> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        const Text(
                           'Chat Options',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.greyLight,
                             fontSize: 14,
                           ),
@@ -440,7 +355,7 @@ class _ChatTabState extends State<ChatTab> {
               },
             ),
             ListTile(
-              leading: Icon(
+              leading: const Icon(
                 Icons.notifications_off_outlined,
                 color: AppColors.neonOrange,
               ),

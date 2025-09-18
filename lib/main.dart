@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/auth_loading_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const SecureChatApp());
+  runApp(const SymmeApp());
 }
 
 /// --- THEME PROVIDER ---
@@ -23,8 +23,8 @@ class ThemeProvider extends ChangeNotifier {
 }
 
 /// --- MAIN APP ---
-class SecureChatApp extends StatelessWidget {
-  const SecureChatApp({super.key});
+class SymmeApp extends StatelessWidget {
+  const SymmeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class SecureChatApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
-            title: 'SecureChat',
+            title: 'Symme',
             themeMode: themeProvider.themeMode,
             theme: ThemeData(
               brightness: Brightness.light,
@@ -45,7 +45,7 @@ class SecureChatApp extends StatelessWidget {
               colorSchemeSeed: Colors.deepPurple,
               useMaterial3: true,
             ),
-            home: const HomeScreen(),
+            home: const AuthLoadingScreen(),
             debugShowCheckedModeBanner: false,
           );
         },

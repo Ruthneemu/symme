@@ -1,7 +1,7 @@
 // services/call_manager.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:symmeapp/screens/call_screen.dart';
+import 'package:symme/screens/call_screen.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock/wakelock.dart';
 import '../models/call.dart';

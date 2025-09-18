@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../models/message.dart';
 import '../services/crypto_service.dart';
@@ -83,9 +83,8 @@ class FirebaseMessageService {
       receiverMessageData['iv'] = encryptionResult['iv'];
       receiverMessageData['senderSecureId'] = senderSecureId;
       receiverMessageData['receiverSecureId'] = receiverSecureId;
-      receiverMessageData['expiresAt'] = now
-          .add(Duration(seconds: expirationSeconds))
-          .millisecondsSinceEpoch;
+      receiverMessageData['expiresAt'] =
+          now.add(Duration(seconds: expirationSeconds)).millisecondsSinceEpoch;
 
       // 3. Create the message payload for the SENDER (unencrypted)
       final senderMessage = Message(
@@ -101,9 +100,8 @@ class FirebaseMessageService {
       final senderMessageData = senderMessage.toJson();
       senderMessageData['senderSecureId'] = senderSecureId;
       senderMessageData['receiverSecureId'] = receiverSecureId;
-      senderMessageData['expiresAt'] = now
-          .add(Duration(seconds: expirationSeconds))
-          .millisecondsSinceEpoch;
+      senderMessageData['expiresAt'] =
+          now.add(Duration(seconds: expirationSeconds)).millisecondsSinceEpoch;
 
       // 4. Atomically write both messages to the database
       await Future.wait([
@@ -156,7 +154,10 @@ class FirebaseMessageService {
       final otherUserId = otherUserData['userId'] as String;
 
       // Listen to messages in the current user's chat path
-      return _database.child('messages/${currentUser.uid}/$otherUserId').onValue.asyncMap((
+      return _database
+          .child('messages/${currentUser.uid}/$otherUserId')
+          .onValue
+          .asyncMap((
         event,
       ) async {
         final data = event.snapshot.value as Map<dynamic, dynamic>?;
@@ -181,8 +182,7 @@ class FirebaseMessageService {
             // A message needs decryption if:
             // 1. It's marked as encrypted AND
             // 2. The current user is NOT the sender (receiver needs to decrypt)
-            final needsDecryption =
-                messageData['isEncrypted'] == true &&
+            final needsDecryption = messageData['isEncrypted'] == true &&
                 messageData['senderId'] != currentUserId;
 
             if (needsDecryption) {
@@ -201,10 +201,10 @@ class FirebaseMessageService {
                 // Use the proper decryption method
                 final decryptedContent =
                     CryptoService.decryptMessageWithCombination(
-                      messageData['content'],
-                      messageData['encryptedCombination'],
-                      privateKey,
-                    );
+                  messageData['content'],
+                  messageData['encryptedCombination'],
+                  privateKey,
+                );
 
                 if (decryptedContent != null) {
                   print(
@@ -289,8 +289,8 @@ class FirebaseMessageService {
         'displayName': displayName, // Add display name
         'lastMessage': lastMessage.type == MessageType.text
             ? lastMessage.content.length > 50
-                  ? '${lastMessage.content.substring(0, 50)}...'
-                  : lastMessage.content
+                ? '${lastMessage.content.substring(0, 50)}...'
+                : lastMessage.content
             : '[${lastMessage.type.name}]',
         'lastMessageTime': lastMessage.timestamp.millisecondsSinceEpoch,
         'updatedAt': ServerValue.timestamp,
@@ -323,9 +323,8 @@ class FirebaseMessageService {
     if (currentUser == null) return;
 
     try {
-      final snapshot = await _database
-          .child('messages/${currentUser.uid}')
-          .once();
+      final snapshot =
+          await _database.child('messages/${currentUser.uid}').once();
       final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
 
       if (data != null) {
@@ -500,29 +499,28 @@ class FirebaseMessageService {
           .orderBy('timestamp', descending: true)
           .snapshots()
           .asyncMap((snapshot) async {
-            final currentUserId = await StorageService.getUserId();
-            if (currentUserId == null) return <String, dynamic>{};
+        final currentUserId = await StorageService.getUserId();
+        if (currentUserId == null) return <String, dynamic>{};
 
-            for (final doc in snapshot.docChanges) {
-              if (doc.type == DocumentChangeType.added) {
-                final data = doc.doc.data() as Map<String, dynamic>;
+        for (final doc in snapshot.docChanges) {
+          if (doc.type == DocumentChangeType.added) {
+            final data = doc.doc.data() as Map<String, dynamic>;
 
-                if (data['receiverId'] == currentUserId) {
-                  doc.doc.reference.delete().catchError((e) {
-                    print('Error deleting call signal: $e');
-                  });
+            if (data['receiverId'] == currentUserId) {
+              doc.doc.reference.delete().catchError((e) {
+                print('Error deleting call signal: $e');
+              });
 
-                  return data;
-                }
-              }
+              return data;
             }
+          }
+        }
 
-            return <String, dynamic>{};
-          })
-          .where((data) => data.isNotEmpty);
+        return <String, dynamic>{};
+      }).where((data) => data.isNotEmpty);
     } catch (e) {
       print('Error listening for call signals: $e');
-      return Stream.empty();
+      return const Stream.empty();
     }
   }
 

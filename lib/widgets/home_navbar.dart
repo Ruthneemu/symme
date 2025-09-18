@@ -25,6 +25,10 @@ class HomeNavBar extends StatelessWidget {
       type: BottomNavigationBarType.fixed,
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Chats"),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.circle_outlined),
+          label: "Circles",
+        ),
         BottomNavigationBarItem(icon: Icon(Icons.people), label: "Contacts"),
         BottomNavigationBarItem(icon: Icon(Icons.phone), label: "Calls"),
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),

@@ -1,7 +1,7 @@
 // screens/call_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'dart:async';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../models/call.dart';
 import '../services/webrtc_service.dart';
 import '../services/call_service.dart';
@@ -267,8 +267,16 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: theme.brightness == Brightness.dark
-              ? [Colors.deepPurple.shade900, Colors.deepPurple.shade700, Colors.black]
-              : [Colors.deepPurple.shade100, Colors.deepPurple.shade200, Colors.white],
+              ? [
+                  Colors.deepPurple.shade900,
+                  Colors.deepPurple.shade700,
+                  Colors.black
+                ]
+              : [
+                  Colors.deepPurple.shade100,
+                  Colors.deepPurple.shade200,
+                  Colors.white
+                ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -353,7 +361,9 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  widget.call.type == CallType.video ? Icons.videocam : Icons.call,
+                  widget.call.type == CallType.video
+                      ? Icons.videocam
+                      : Icons.call,
                   color: Colors.white,
                   size: 16,
                 ),
@@ -450,7 +460,9 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         height: size,
         decoration: BoxDecoration(
           color: backgroundColor ??
-              (isActive ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.5)),
+              (isActive
+                  ? Colors.white.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.5)),
           shape: BoxShape.circle,
           border: Border.all(
             color: Colors.white.withOpacity(0.3),

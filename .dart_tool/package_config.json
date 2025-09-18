@@ -93,9 +93,9 @@
     },
     {
       "name": "device_info_plus",
-      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/device_info_plus-11.5.0",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/device_info_plus-10.1.2",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.3"
     },
     {
       "name": "device_info_plus_platform_interface",
@@ -302,6 +302,12 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "mobile_scanner",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/mobile_scanner-7.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.7"
+    },
+    {
       "name": "nested",
       "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/nested-1.0.0",
       "packageUri": "lib/",
@@ -408,6 +414,18 @@
       "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/provider-6.1.5+1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "qr",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/qr-3.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "qr_flutter",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/qr_flutter-4.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.19"
     },
     {
       "name": "ringtone_player",
@@ -579,9 +597,9 @@
     },
     {
       "name": "win32_registry",
-      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/win32_registry-2.1.0",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/win32_registry-1.1.5",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.4"
     },
     {
       "name": "xdg_directories",
@@ -590,7 +608,7 @@
       "languageVersion": "3.3"
     },
     {
-      "name": "symmeapp",
+      "name": "symme",
       "rootUri": "../",
       "packageUri": "lib/",
       "languageVersion": "3.8"
