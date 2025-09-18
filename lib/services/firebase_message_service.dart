@@ -6,13 +6,14 @@ import '../services/crypto_service.dart';
 import '../services/storage_service.dart';
 import 'dart:async';
 import '../models/call.dart';
+import '../services/firebase_auth_service.dart';
 
 class FirebaseMessageService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final DatabaseReference _database = FirebaseDatabase.instance.ref();
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Send encrypted message
+  // Send encrypted message - FIXED VERSION
   static Future<bool> sendMessage({
     required String receiverSecureId,
     required String content,
@@ -21,41 +22,46 @@ class FirebaseMessageService {
   }) async {
     try {
       final sender = _auth.currentUser;
-      if (sender == null) return false;
+      if (sender == null) {
+        print('ERROR: No authenticated user found');
+        return false;
+      }
 
-      // Get receiver's public key
-      final receiverData = await _getUserBySecureId(receiverSecureId);
-      if (receiverData == null) return false;
+      print('Attempting to send message to: $receiverSecureId');
+
+      // Get receiver data using the FirebaseAuthService method
+      final receiverData = await FirebaseAuthService.getUserBySecureId(receiverSecureId);
+      if (receiverData == null) {
+        print('ERROR: Receiver not found for secure ID: $receiverSecureId');
+        return false;
+      }
 
       final receiverPublicKey = receiverData['publicKey'] as String?;
       final receiverId = receiverData['userId'] as String?;
 
-      // Check for null values
       if (receiverPublicKey == null || receiverId == null) {
-        print(
-          'Missing receiver data: publicKey=$receiverPublicKey, userId=$receiverId',
-        );
+        print('ERROR: Missing receiver data - publicKey: $receiverPublicKey, userId: $receiverId');
         return false;
       }
 
-      // Get sender's secure ID - add null check
+      // Get sender's secure ID
       final senderSecureId = await StorageService.getUserSecureId();
       if (senderSecureId == null) {
-        print('Sender secure ID is null');
+        print('ERROR: Sender secure ID is null');
         return false;
       }
 
+      print('Encrypting message...');
       // Encrypt message
       final encryptionResult = CryptoService.encryptMessage(
         content,
-        receiverData['publicKey']
-            as String, // Use the correct key from your service
+        receiverPublicKey,
       );
+
       // Create message object
       final messageId = CryptoService.generateMessageId();
       final now = DateTime.now();
-      final expirationSeconds =
-          expiresInSeconds ?? (7 * 24 * 60 * 60); // 7 days default
+      final expirationSeconds = expiresInSeconds ?? (7 * 24 * 60 * 60); // 7 days default
 
       final message = Message(
         id: messageId,
@@ -68,84 +74,159 @@ class FirebaseMessageService {
         expiresInSeconds: expirationSeconds,
       );
 
-      // Store encrypted message in Firebase
+      // Prepare message data for Firebase
       final messageData = message.toJson();
-      messageData['encryptedCombination'] =
-          encryptionResult['encryptedCombination'];
+      messageData['encryptedCombination'] = encryptionResult['encryptedCombination'];
       messageData['combinationId'] = encryptionResult['combinationId'];
-      messageData['iv'] = encryptionResult['iv']; // Add IV for AES decryption
-
-      await StorageService.getUserSecureId();
+      messageData['iv'] = encryptionResult['iv'];
       messageData['senderSecureId'] = senderSecureId;
-
       messageData['receiverSecureId'] = receiverSecureId;
       messageData['expiresAt'] = now
           .add(Duration(seconds: expirationSeconds))
           .millisecondsSinceEpoch;
 
-      // Store only in sender's path (receiver will get it through real-time sync)
-      await _database
-          .child('messages/${sender.uid}/$receiverId/$messageId')
-          .set(messageData);
-      // Update chat room info
-      // await _updateChatRoom(sender.uid, receiverId, message);
-      //await _updateChatRoom(receiverId, sender.uid, message);
+      print('Saving message to Firebase...');
 
-      // Store sender's copy locally with message key for decryption
+      // Store message in BOTH sender's and receiver's paths
+      // This ensures both users can see the conversation
+      await Future.wait([
+        // Save in sender's path
+        _database
+            .child('messages/${sender.uid}/$receiverId/$messageId')
+            .set(messageData),
+        // Save in receiver's path
+        _database
+            .child('messages/$receiverId/${sender.uid}/$messageId')
+            .set(messageData),
+      ]);
+
+      print('Updating chat rooms...');
+      
+      // Update chat room info for both users
+      await Future.wait([
+        _updateChatRoom(sender.uid, receiverId, message, receiverSecureId),
+        _updateChatRoom(receiverId, sender.uid, message, senderSecureId),
+      ]);
+
+      // Store sender's copy locally with unencrypted content
       final localMessage = message.copyWith(
         content: content, // Store unencrypted for sender
       );
       await _storeMessageLocally(sender.uid, receiverId, localMessage);
 
+      print('Message sent successfully!');
       return true;
     } catch (e, stackTrace) {
-      print('Error sending message: $e');
+      print('ERROR sending message: $e');
       print('Stack trace: $stackTrace');
       return false;
     }
   }
 
-  // Get messages for a chat
+  // Get messages for a chat - IMPROVED VERSION
   static Stream<List<Message>> getMessages(String otherUserSecureId) {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return Stream.value([]);
 
-    // Listen to messages where current user is sender OR receiver
-    final sentMessagesStream = _database
-        .child('messages/${currentUser.uid}')
-        .orderByChild('receiverSecureId')
-        .equalTo(otherUserSecureId)
-        .onValue;
+    return _getUserBySecureId(otherUserSecureId).asStream().asyncExpand((otherUserData) {
+      if (otherUserData == null) return Stream.value(<Message>[]);
+      
+      final otherUserId = otherUserData['userId'] as String;
+      
+      // Listen to messages in the current user's chat with the other user
+      return _database
+          .child('messages/${currentUser.uid}/$otherUserId')
+          .onValue
+          .asyncMap((event) async {
+        final data = event.snapshot.value as Map<dynamic, dynamic>?;
+        if (data == null) return <Message>[];
 
-    final receivedMessagesStream = _database
-        .child('messages')
-        .orderByChild('senderSecureId')
-        .equalTo(otherUserSecureId)
-        .onValue;
-
-    return sentMessagesStream.asyncMap((event) async {
-      // For now, just return sent messages to test
-      final data = event.snapshot.value as Map<dynamic, dynamic>?;
-      if (data == null) return <Message>[];
-
-      final messages = <Message>[];
-      for (final userEntry in data.entries) {
-        final userData = userEntry.value as Map<dynamic, dynamic>;
-        for (final messageEntry in userData.entries) {
-          final messageData = messageEntry.value as Map<dynamic, dynamic>;
+        final messages = <Message>[];
+        for (final messageEntry in data.entries) {
           try {
-            final message = Message.fromJson(
-              Map<String, dynamic>.from(messageData),
-            );
+            final messageData = messageEntry.value as Map<dynamic, dynamic>;
+            
+            // Convert to proper Map<String, dynamic>
+            final messageMap = Map<String, dynamic>.from(messageData);
+            
+            // Try to decrypt if this is an encrypted message for us
+            if (messageMap['isEncrypted'] == true && 
+                messageMap['receiverId'] == currentUser.uid) {
+              
+              final privateKey = await StorageService.getUserPrivateKey();
+              if (privateKey != null && messageMap['encryptedCombination'] != null) {
+                final decryptedContent = CryptoService.decryptMessageWithCombination(
+                  messageMap['content'],
+                  messageMap['encryptedCombination'],
+                  privateKey,
+                );
+                
+                if (decryptedContent != null) {
+                  messageMap['content'] = decryptedContent;
+                } else {
+                  messageMap['content'] = '[Encrypted Message - Cannot Decrypt]';
+                }
+              }
+            }
+            
+            final message = Message.fromJson(messageMap);
             messages.add(message);
           } catch (e) {
             print('Error parsing message: $e');
           }
         }
-      }
 
-      return messages..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        return messages;
+      });
     });
+  }
+
+  // Helper method to get user by secure ID
+  static Future<Map<String, dynamic>?> _getUserBySecureId(String secureId) async {
+    return await FirebaseAuthService.getUserBySecureId(secureId);
+  }
+
+  // Updated chat room update method
+  static Future<void> _updateChatRoom(
+    String userId1,
+    String userId2,
+    Message lastMessage,
+    String otherUserSecureId,
+  ) async {
+    try {
+      final chatRoomId = CryptoService.generateRoomId(userId1, userId2);
+
+      await _database.child('chatRooms/$userId1/$userId2').update({
+        'roomId': chatRoomId,
+        'otherUserSecureId': otherUserSecureId,
+        'lastMessage': lastMessage.type == MessageType.text
+            ? lastMessage.content.length > 50 
+                ? '${lastMessage.content.substring(0, 50)}...'
+                : lastMessage.content
+            : '[${lastMessage.type.name}]',
+        'lastMessageTime': lastMessage.timestamp.millisecondsSinceEpoch,
+        'updatedAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      print('Error updating chat room: $e');
+    }
+  }
+
+  // Store message locally
+  static Future<void> _storeMessageLocally(
+    String senderId,
+    String receiverId,
+    Message message,
+  ) async {
+    try {
+      final roomId = CryptoService.generateRoomId(senderId, receiverId);
+      final messages = await StorageService.getMessages(roomId);
+      messages.add(message);
+      await StorageService.saveMessages(roomId, messages);
+    } catch (e) {
+      print('Error storing message locally: $e');
+    }
   }
 
   // Mark message as read
@@ -160,22 +241,12 @@ class FirebaseMessageService {
       await _database
           .child('messages/${currentUser.uid}/$otherUserId/$messageId')
           .update({'isRead': true});
-
-      // Also update in sender's copy (only if we have permission)
-      try {
-        await _database
-            .child('messages/$otherUserId/${currentUser.uid}/$messageId')
-            .update({'isDelivered': true});
-      } catch (e) {
-        print('Could not update delivery status (permission issue): $e');
-        // This is expected if we don't have write permission to other user's data
-      }
     } catch (e) {
       print('Error marking message as read: $e');
     }
   }
 
-  // Clean up expired messages (only clean current user's messages to avoid permission issues)
+  // Clean up expired messages
   static Future<void> cleanupExpiredMessages() async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -198,7 +269,6 @@ class FirebaseMessageService {
 
             if (expiresAt != null && now > expiresAt) {
               try {
-                // Delete expired message (only from current user's path)
                 await _database
                     .child(
                       'messages/${currentUser.uid}/${chatEntry.key}/${messageEntry.key}',
@@ -216,96 +286,12 @@ class FirebaseMessageService {
     }
   }
 
-  static Future<Map<String, dynamic>?> _getUserBySecureId(
-    String secureId,
-  ) async {
-    try {
-      final idSnapshot = await _database.child('secureIds/$secureId').once();
-      if (!idSnapshot.snapshot.exists) {
-        print('Secure ID $secureId not found');
-        return null;
-      }
-
-      final idData = idSnapshot.snapshot.value as Map<dynamic, dynamic>?;
-      if (idData == null) {
-        print('Secure ID data is null');
-        return null;
-      }
-
-      final isActive = idData['isActive'] as bool?;
-      if (isActive != true) {
-        print('Secure ID is not active');
-        return null;
-      }
-
-      final userId = idData['userId'] as String?;
-      if (userId == null) {
-        print('User ID is null for secure ID $secureId');
-        return null;
-      }
-
-      final userSnapshot = await _database.child('users/$userId').once();
-      if (userSnapshot.snapshot.exists) {
-        final userData = userSnapshot.snapshot.value as Map<dynamic, dynamic>?;
-        if (userData != null) {
-          final result = Map<String, dynamic>.from(userData);
-          result['userId'] = userId; // Ensure userId is included
-          return result;
-        }
-      }
-
-      print('User data not found for user ID $userId');
-      return null;
-    } catch (e) {
-      print('Error getting user by secure ID: $e');
-      return null;
-    }
-  }
-
-  static Future<void> _updateChatRoom(
-    String userId1,
-    String userId2,
-    Message lastMessage,
-  ) async {
-    try {
-      final chatRoomId = CryptoService.generateRoomId(userId1, userId2);
-
-      await _database.child('chatRooms/$userId1/$userId2').update({
-        'roomId': chatRoomId,
-        'lastMessage': lastMessage.type == MessageType.text
-            ? lastMessage.content
-            : '[${lastMessage.type.name}]',
-        'lastMessageTime': lastMessage.timestamp.millisecondsSinceEpoch,
-        'updatedAt': ServerValue.timestamp,
-      });
-    } catch (e) {
-      print('Error updating chat room: $e');
-    }
-  }
-
-  static Future<void> _storeMessageLocally(
-    String senderId,
-    String receiverId,
-    Message message,
-  ) async {
-    try {
-      final roomId = CryptoService.generateRoomId(senderId, receiverId);
-      final messages = await StorageService.getMessages(roomId);
-      messages.add(message);
-      await StorageService.saveMessages(roomId, messages);
-    } catch (e) {
-      print('Error storing message locally: $e');
-    }
-  }
-
   // Get chat rooms
   static Stream<List<Map<String, dynamic>>> getChatRooms() {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return Stream.value([]);
 
-    return _database.child('chatRooms/${currentUser.uid}').onValue.asyncMap((
-      event,
-    ) async {
+    return _database.child('chatRooms/${currentUser.uid}').onValue.asyncMap((event) async {
       final data = event.snapshot.value as Map<dynamic, dynamic>?;
       if (data == null) return <Map<String, dynamic>>[];
 
@@ -315,23 +301,20 @@ class FirebaseMessageService {
         try {
           final chatData = entry.value as Map<dynamic, dynamic>;
           final otherUserId = entry.key as String;
+          final otherUserSecureId = chatData['otherUserSecureId'] as String?;
 
-          // Get other user's info
-          final otherUserSnapshot = await _database
-              .child('users/$otherUserId')
-              .once();
-          if (otherUserSnapshot.snapshot.exists) {
-            final otherUserData =
-                otherUserSnapshot.snapshot.value as Map<dynamic, dynamic>;
-
+          if (otherUserSecureId != null) {
+            // Get other user's current info
+            final otherUserData = await FirebaseAuthService.getUserBySecureId(otherUserSecureId);
+            
             chatRooms.add({
               'otherUserId': otherUserId,
-              'otherUserSecureId': otherUserData['secureId'],
+              'otherUserSecureId': otherUserSecureId,
               'lastMessage': chatData['lastMessage'],
               'lastMessageTime': chatData['lastMessageTime'],
               'roomId': chatData['roomId'],
-              'isOnline': otherUserData['isActive'] ?? false,
-              'lastSeen': otherUserData['lastSeen'],
+              'isOnline': otherUserData?['isActive'] ?? false,
+              'lastSeen': otherUserData?['lastSeen'],
             });
           }
         } catch (e) {
@@ -358,7 +341,6 @@ class FirebaseMessageService {
     if (currentUser == null) return false;
 
     try {
-      // Only delete from current user's path to avoid permission issues
       await _database
           .child('messages/${currentUser.uid}/$otherUserId/$messageId')
           .remove();
@@ -375,12 +357,10 @@ class FirebaseMessageService {
     if (currentUser == null) return false;
 
     try {
-      // Only clear from current user's path to avoid permission issues
       await _database
           .child('messages/${currentUser.uid}/$otherUserId')
           .remove();
 
-      // Also clear the chat room entry
       await _database
           .child('chatRooms/${currentUser.uid}/$otherUserId')
           .remove();
@@ -391,107 +371,105 @@ class FirebaseMessageService {
       return false;
     }
   }
+
+  // Call signal methods remain the same...
   static Future<bool> sendCallSignal({
-  required String receiverId,
-  required String callId,
-  required String type, // 'offer', 'answer', 'ice-candidate', 'decline', 'end'
-  required Map<String, dynamic> data,
-  required CallType callType,
-}) async {
-  try {
-    final currentUserId = await StorageService.getUserId();
-    if (currentUserId == null) return false;
-
-    // First, get the receiver's actual user ID from secure ID
-    String actualReceiverId = receiverId;
-    
-    // If receiverId looks like a secure ID, resolve it to actual user ID
-    if (!receiverId.startsWith('user_')) {
-      final receiverQuery = await _firestore
-          .collection('users')
-          .where('secureId', isEqualTo: receiverId)
-          .limit(1)
-          .get();
-
-      if (receiverQuery.docs.isNotEmpty) {
-        actualReceiverId = receiverQuery.docs.first.id;
-      }
-    }
-
-    final signalData = {
-      'senderId': currentUserId,
-      'receiverId': actualReceiverId,
-      'callId': callId,
-      'type': type,
-      'data': data,
-      'callType': callType.toString().split('.').last,
-      'timestamp': FieldValue.serverTimestamp(),
-    };
-
-    await _firestore
-        .collection('call_signals')
-        .add(signalData);
-
-    return true;
-  } catch (e) {
-    print('Error sending call signal: $e');
-    return false;
-  }
-}
-
-static Stream<Map<String, dynamic>> listenForCallSignals() {
-  try {
-    return _firestore
-        .collection('call_signals')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .asyncMap((snapshot) async {
+    required String receiverId,
+    required String callId,
+    required String type,
+    required Map<String, dynamic> data,
+    required CallType callType,
+  }) async {
+    try {
       final currentUserId = await StorageService.getUserId();
-      if (currentUserId == null) return <String, dynamic>{};
+      if (currentUserId == null) return false;
 
-      for (final doc in snapshot.docChanges) {
-        if (doc.type == DocumentChangeType.added) {
-          final data = doc.doc.data() as Map<String, dynamic>;
-          
-          // Check if this signal is for current user
-          if (data['receiverId'] == currentUserId) {
-            // Delete the signal after processing
-            doc.doc.reference.delete().catchError((e) {
-              print('Error deleting call signal: $e');
-            });
-            
-            return data;
-          }
+      String actualReceiverId = receiverId;
+      
+      if (!receiverId.startsWith('user_')) {
+        final receiverQuery = await _firestore
+            .collection('users')
+            .where('secureId', isEqualTo: receiverId)
+            .limit(1)
+            .get();
+
+        if (receiverQuery.docs.isNotEmpty) {
+          actualReceiverId = receiverQuery.docs.first.id;
         }
       }
-      
-      return <String, dynamic>{};
-    }).where((data) => data.isNotEmpty);
-  } catch (e) {
-    print('Error listening for call signals: $e');
-    return Stream.empty();
-  }
-}
 
-static Future<void> cleanupExpiredCallSignals() async {
-  try {
-    final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
-    
-    final query = await _firestore
-        .collection('call_signals')
-        .where('timestamp', isLessThan: Timestamp.fromDate(oneHourAgo))
-        .get();
+      final signalData = {
+        'senderId': currentUserId,
+        'receiverId': actualReceiverId,
+        'callId': callId,
+        'type': type,
+        'data': data,
+        'callType': callType.toString().split('.').last,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
 
-    final batch = _firestore.batch();
-    
-    for (final doc in query.docs) {
-      batch.delete(doc.reference);
+      await _firestore
+          .collection('call_signals')
+          .add(signalData);
+
+      return true;
+    } catch (e) {
+      print('Error sending call signal: $e');
+      return false;
     }
-
-    await batch.commit();
-    print('Cleaned up ${query.docs.length} expired call signals');
-  } catch (e) {
-    print('Error cleaning up expired call signals: $e');
   }
-}
+
+  static Stream<Map<String, dynamic>> listenForCallSignals() {
+    try {
+      return _firestore
+          .collection('call_signals')
+          .orderBy('timestamp', descending: true)
+          .snapshots()
+          .asyncMap((snapshot) async {
+        final currentUserId = await StorageService.getUserId();
+        if (currentUserId == null) return <String, dynamic>{};
+
+        for (final doc in snapshot.docChanges) {
+          if (doc.type == DocumentChangeType.added) {
+            final data = doc.doc.data() as Map<String, dynamic>;
+            
+            if (data['receiverId'] == currentUserId) {
+              doc.doc.reference.delete().catchError((e) {
+                print('Error deleting call signal: $e');
+              });
+              
+              return data;
+            }
+          }
+        }
+        
+        return <String, dynamic>{};
+      }).where((data) => data.isNotEmpty);
+    } catch (e) {
+      print('Error listening for call signals: $e');
+      return Stream.empty();
+    }
+  }
+
+  static Future<void> cleanupExpiredCallSignals() async {
+    try {
+      final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
+      
+      final query = await _firestore
+          .collection('call_signals')
+          .where('timestamp', isLessThan: Timestamp.fromDate(oneHourAgo))
+          .get();
+
+      final batch = _firestore.batch();
+      
+      for (final doc in query.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+      print('Cleaned up ${query.docs.length} expired call signals');
+    } catch (e) {
+      print('Error cleaning up expired call signals: $e');
+    }
+  }
 }

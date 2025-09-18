@@ -52,9 +52,11 @@ class FirebaseAuthService {
           'isActive': true,
         });
 
-        // Store private key locally
+        // Store private key and secure ID locally
         await StorageService.setUserPrivateKey(keyPair['private']!);
         await StorageService.setUserSecureId(secureId);
+        // ADD THIS LINE - Store user ID locally
+        await StorageService.setUserId(userId);
       } else {
         // Update last seen
         await _database.child('users/$userId').update({
@@ -65,6 +67,8 @@ class FirebaseAuthService {
         // Get and store secure ID locally
         final userData = snapshot.snapshot.value as Map<dynamic, dynamic>;
         await StorageService.setUserSecureId(userData['secureId']);
+        // ADD THIS LINE - Store user ID locally for existing users
+        await StorageService.setUserId(userId);
       }
     } catch (e) {
       print('Error initializing user data: $e');
@@ -130,6 +134,8 @@ class FirebaseAuthService {
       // Update local storage
       await StorageService.setUserPrivateKey(newKeyPair['private']!);
       await StorageService.setUserSecureId(newSecureId);
+      // ADD THIS LINE - Update user ID in local storage
+      await StorageService.setUserId(user.uid);
 
       return true;
     } catch (e) {
