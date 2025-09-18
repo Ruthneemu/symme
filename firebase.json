@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"symme-a0f87","appId":"1:596749462611:android:4656e62a8a89d460742aa6","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"symme-a0f87","configurations":{"android":"1:596749462611:android:4656e62a8a89d460742aa6","ios":"1:596749462611:ios:f80fd774afb73049742aa6","macos":"1:596749462611:ios:f80fd774afb73049742aa6","web":"1:596749462611:web:949acf171e3514b6742aa6","windows":"1:596749462611:web:0e96f79293431f30742aa6"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "symme-app",
+          "appId": "1:436953256086:android:33b3756f003502b4e54215",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "symme-app",
+          "configurations": {
+            "android": "1:436953256086:android:33b3756f003502b4e54215",
+            "ios": "1:436953256086:ios:e25318398399589ae54215",
+            "macos": "1:436953256086:ios:e25318398399589ae54215",
+            "web": "1:436953256086:web:4f621396a8be4482e54215",
+            "windows": "1:436953256086:windows:f7792723c834988ae54215"
+          }
+        }
+      }
+    }
+  },
+  "database": {
+    "rules": "database.rules.json"
+  }
+}

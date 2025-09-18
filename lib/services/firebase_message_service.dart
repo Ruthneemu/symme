@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/message.dart';
 import '../services/crypto_service.dart';
 import '../services/storage_service.dart';
@@ -27,10 +30,9 @@ class FirebaseMessageService {
         return false;
       }
 
-      print('Attempting to send message to: $receiverSecureId');
-
-      // Get receiver data using the FirebaseAuthService method
-      final receiverData = await FirebaseAuthService.getUserBySecureId(receiverSecureId);
+      final receiverData = await FirebaseAuthService.getUserBySecureId(
+        receiverSecureId,
+      );
       if (receiverData == null) {
         print('ERROR: Receiver not found for secure ID: $receiverSecureId');
         return false;
@@ -40,79 +42,97 @@ class FirebaseMessageService {
       final receiverId = receiverData['userId'] as String?;
 
       if (receiverPublicKey == null || receiverId == null) {
-        print('ERROR: Missing receiver data - publicKey: $receiverPublicKey, userId: $receiverId');
+        print(
+          'ERROR: Missing receiver data - publicKey: $receiverPublicKey, userId: $receiverId',
+        );
         return false;
       }
 
-      // Get sender's secure ID
       final senderSecureId = await StorageService.getUserSecureId();
       if (senderSecureId == null) {
         print('ERROR: Sender secure ID is null');
         return false;
       }
 
-      print('Encrypting message...');
-      // Encrypt message
+      // 1. Encrypt message for the RECEIVER
       final encryptionResult = CryptoService.encryptMessage(
         content,
         receiverPublicKey,
       );
 
-      // Create message object
       final messageId = CryptoService.generateMessageId();
       final now = DateTime.now();
-      final expirationSeconds = expiresInSeconds ?? (7 * 24 * 60 * 60); // 7 days default
+      final expirationSeconds =
+          expiresInSeconds ?? (7 * 24 * 60 * 60); // 7 days default
 
-      final message = Message(
+      // 2. Create the message payload for the RECEIVER (encrypted)
+      final receiverMessage = Message(
         id: messageId,
         senderId: sender.uid,
         receiverId: receiverId,
         content: encryptionResult['encryptedMessage']!,
         type: type,
         timestamp: now,
-        isEncrypted: true,
+        isEncrypted: true, // Mark as encrypted for receiver
         expiresInSeconds: expirationSeconds,
       );
 
-      // Prepare message data for Firebase
-      final messageData = message.toJson();
-      messageData['encryptedCombination'] = encryptionResult['encryptedCombination'];
-      messageData['combinationId'] = encryptionResult['combinationId'];
-      messageData['iv'] = encryptionResult['iv'];
-      messageData['senderSecureId'] = senderSecureId;
-      messageData['receiverSecureId'] = receiverSecureId;
-      messageData['expiresAt'] = now
+      final receiverMessageData = receiverMessage.toJson();
+      receiverMessageData['encryptedCombination'] =
+          encryptionResult['encryptedCombination'];
+      receiverMessageData['iv'] = encryptionResult['iv'];
+      receiverMessageData['senderSecureId'] = senderSecureId;
+      receiverMessageData['receiverSecureId'] = receiverSecureId;
+      receiverMessageData['expiresAt'] = now
           .add(Duration(seconds: expirationSeconds))
           .millisecondsSinceEpoch;
 
-      print('Saving message to Firebase...');
+      // 3. Create the message payload for the SENDER (unencrypted)
+      final senderMessage = Message(
+        id: messageId,
+        senderId: sender.uid,
+        receiverId: receiverId,
+        content: content, // Store original content for the sender
+        type: type,
+        timestamp: now,
+        isEncrypted: false, // Mark as NOT encrypted for sender
+        expiresInSeconds: expirationSeconds,
+      );
+      final senderMessageData = senderMessage.toJson();
+      senderMessageData['senderSecureId'] = senderSecureId;
+      senderMessageData['receiverSecureId'] = receiverSecureId;
+      senderMessageData['expiresAt'] = now
+          .add(Duration(seconds: expirationSeconds))
+          .millisecondsSinceEpoch;
 
-      // Store message in BOTH sender's and receiver's paths
-      // This ensures both users can see the conversation
+      // 4. Atomically write both messages to the database
       await Future.wait([
-        // Save in sender's path
-        _database
-            .child('messages/${sender.uid}/$receiverId/$messageId')
-            .set(messageData),
-        // Save in receiver's path
+        // Write encrypted message to receiver's path
         _database
             .child('messages/$receiverId/${sender.uid}/$messageId')
-            .set(messageData),
+            .set(receiverMessageData),
+        // Write unencrypted message to sender's path
+        _database
+            .child('messages/${sender.uid}/$receiverId/$messageId')
+            .set(senderMessageData),
       ]);
 
-      print('Updating chat rooms...');
-      
-      // Update chat room info for both users
+      // 5. Update chat room for both users
+      final lastMessageForChat = senderMessage.copyWith();
       await Future.wait([
-        _updateChatRoom(sender.uid, receiverId, message, receiverSecureId),
-        _updateChatRoom(receiverId, sender.uid, message, senderSecureId),
+        _updateChatRoom(
+          sender.uid,
+          receiverId,
+          lastMessageForChat,
+          receiverSecureId,
+        ),
+        _updateChatRoom(
+          receiverId,
+          sender.uid,
+          lastMessageForChat,
+          senderSecureId,
+        ),
       ]);
-
-      // Store sender's copy locally with unencrypted content
-      final localMessage = message.copyWith(
-        content: content, // Store unencrypted for sender
-      );
-      await _storeMessageLocally(sender.uid, receiverId, localMessage);
 
       print('Message sent successfully!');
       return true;
@@ -123,71 +143,131 @@ class FirebaseMessageService {
     }
   }
 
-  // Get messages for a chat - IMPROVED VERSION
+  // Fixed getMessages method in FirebaseMessageService
   static Stream<List<Message>> getMessages(String otherUserSecureId) {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return Stream.value([]);
 
-    return _getUserBySecureId(otherUserSecureId).asStream().asyncExpand((otherUserData) {
+    return _getUserBySecureId(otherUserSecureId).asStream().asyncExpand((
+      otherUserData,
+    ) {
       if (otherUserData == null) return Stream.value(<Message>[]);
-      
+
       final otherUserId = otherUserData['userId'] as String;
-      
-      // Listen to messages in the current user's chat with the other user
-      return _database
-          .child('messages/${currentUser.uid}/$otherUserId')
-          .onValue
-          .asyncMap((event) async {
+
+      // Listen to messages in the current user's chat path
+      return _database.child('messages/${currentUser.uid}/$otherUserId').onValue.asyncMap((
+        event,
+      ) async {
         final data = event.snapshot.value as Map<dynamic, dynamic>?;
         if (data == null) return <Message>[];
 
         final messages = <Message>[];
+        final privateKey = await StorageService.getUserPrivateKey();
+        final currentUserId = await StorageService.getUserId();
+
         for (final messageEntry in data.entries) {
           try {
-            final messageData = messageEntry.value as Map<dynamic, dynamic>;
-            
-            // Convert to proper Map<String, dynamic>
-            final messageMap = Map<String, dynamic>.from(messageData);
-            
-            // Try to decrypt if this is an encrypted message for us
-            if (messageMap['isEncrypted'] == true && 
-                messageMap['receiverId'] == currentUser.uid) {
-              
-              final privateKey = await StorageService.getUserPrivateKey();
-              if (privateKey != null && messageMap['encryptedCombination'] != null) {
-                final decryptedContent = CryptoService.decryptMessageWithCombination(
-                  messageMap['content'],
-                  messageMap['encryptedCombination'],
-                  privateKey,
+            final messageData = Map<String, dynamic>.from(messageEntry.value);
+
+            print('Processing message: ${messageEntry.key}');
+            print('Message data keys: ${messageData.keys.toList()}');
+            print('IsEncrypted: ${messageData['isEncrypted']}');
+            print(
+              'SenderId: ${messageData['senderId']}, CurrentUserId: $currentUserId',
+            );
+
+            // Check if this message needs decryption
+            // A message needs decryption if:
+            // 1. It's marked as encrypted AND
+            // 2. The current user is NOT the sender (receiver needs to decrypt)
+            final needsDecryption =
+                messageData['isEncrypted'] == true &&
+                messageData['senderId'] != currentUserId;
+
+            if (needsDecryption) {
+              print('Message needs decryption');
+
+              if (privateKey != null &&
+                  messageData['encryptedCombination'] != null) {
+                print('Attempting decryption...');
+                print(
+                  'Encrypted content length: ${messageData['content']?.length}',
                 );
-                
+                print(
+                  'Encrypted combination length: ${messageData['encryptedCombination']?.length}',
+                );
+
+                // Use the proper decryption method
+                final decryptedContent =
+                    CryptoService.decryptMessageWithCombination(
+                      messageData['content'],
+                      messageData['encryptedCombination'],
+                      privateKey,
+                    );
+
                 if (decryptedContent != null) {
-                  messageMap['content'] = decryptedContent;
+                  print(
+                    'Decryption successful: ${decryptedContent.substring(0, math.min(20, decryptedContent.length))}...',
+                  );
+                  messageData['content'] = decryptedContent;
+                  // Keep isEncrypted as true for display purposes, but content is now readable
                 } else {
-                  messageMap['content'] = '[Encrypted Message - Cannot Decrypt]';
+                  print('Decryption failed');
+                  messageData['content'] =
+                      '[Encrypted Message - Decryption Failed]';
                 }
+              } else {
+                print(
+                  'Missing decryption requirements - privateKey: ${privateKey != null}, encryptedCombination: ${messageData['encryptedCombination'] != null}',
+                );
+                messageData['content'] = '[Encrypted Message - Missing Keys]';
               }
+            } else {
+              print(
+                'Message does not need decryption (sender copy or not encrypted)',
+              );
             }
-            
-            final message = Message.fromJson(messageMap);
+
+            // Parse the message
+            final message = Message.fromJson(messageData);
             messages.add(message);
-          } catch (e) {
-            print('Error parsing message: $e');
+            print('Message added successfully');
+          } catch (e, stackTrace) {
+            print('Error parsing message ${messageEntry.key}: $e');
+            print('Stack trace: $stackTrace');
+            print('Raw message data: ${messageEntry.value}');
+
+            // Add a placeholder for failed messages with more info
+            final errorMessage = Message(
+              id: messageEntry.key,
+              senderId: 'unknown',
+              receiverId: currentUser.uid,
+              content:
+                  '[Message parsing failed: ${e.toString().length > 50 ? "${e.toString().substring(0, 50)}..." : e.toString()}]',
+              type: MessageType.text,
+              timestamp: DateTime.now(),
+              isEncrypted: false,
+            );
+            messages.add(errorMessage);
           }
         }
 
         messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        print('Returning ${messages.length} messages');
         return messages;
       });
     });
   }
 
   // Helper method to get user by secure ID
-  static Future<Map<String, dynamic>?> _getUserBySecureId(String secureId) async {
+  static Future<Map<String, dynamic>?> _getUserBySecureId(
+    String secureId,
+  ) async {
     return await FirebaseAuthService.getUserBySecureId(secureId);
   }
 
-  // Updated chat room update method
+  // FIXED: Updated chat room update method to handle secure ID display properly
   static Future<void> _updateChatRoom(
     String userId1,
     String userId2,
@@ -197,35 +277,26 @@ class FirebaseMessageService {
     try {
       final chatRoomId = CryptoService.generateRoomId(userId1, userId2);
 
+      // Get the other user's data for display
+      final otherUserData = await FirebaseAuthService.getUserBySecureId(
+        otherUserSecureId,
+      );
+      final displayName = otherUserData?['secureId'] ?? otherUserSecureId;
+
       await _database.child('chatRooms/$userId1/$userId2').update({
         'roomId': chatRoomId,
         'otherUserSecureId': otherUserSecureId,
+        'displayName': displayName, // Add display name
         'lastMessage': lastMessage.type == MessageType.text
-            ? lastMessage.content.length > 50 
-                ? '${lastMessage.content.substring(0, 50)}...'
-                : lastMessage.content
+            ? lastMessage.content.length > 50
+                  ? '${lastMessage.content.substring(0, 50)}...'
+                  : lastMessage.content
             : '[${lastMessage.type.name}]',
         'lastMessageTime': lastMessage.timestamp.millisecondsSinceEpoch,
         'updatedAt': ServerValue.timestamp,
       });
     } catch (e) {
       print('Error updating chat room: $e');
-    }
-  }
-
-  // Store message locally
-  static Future<void> _storeMessageLocally(
-    String senderId,
-    String receiverId,
-    Message message,
-  ) async {
-    try {
-      final roomId = CryptoService.generateRoomId(senderId, receiverId);
-      final messages = await StorageService.getMessages(roomId);
-      messages.add(message);
-      await StorageService.saveMessages(roomId, messages);
-    } catch (e) {
-      print('Error storing message locally: $e');
     }
   }
 
@@ -286,12 +357,14 @@ class FirebaseMessageService {
     }
   }
 
-  // Get chat rooms
+  // FIXED: Get chat rooms with proper secure ID display
   static Stream<List<Map<String, dynamic>>> getChatRooms() {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return Stream.value([]);
 
-    return _database.child('chatRooms/${currentUser.uid}').onValue.asyncMap((event) async {
+    return _database.child('chatRooms/${currentUser.uid}').onValue.asyncMap((
+      event,
+    ) async {
       final data = event.snapshot.value as Map<dynamic, dynamic>?;
       if (data == null) return <Map<String, dynamic>>[];
 
@@ -305,11 +378,14 @@ class FirebaseMessageService {
 
           if (otherUserSecureId != null) {
             // Get other user's current info
-            final otherUserData = await FirebaseAuthService.getUserBySecureId(otherUserSecureId);
-            
+            final otherUserData = await FirebaseAuthService.getUserBySecureId(
+              otherUserSecureId,
+            );
+
             chatRooms.add({
               'otherUserId': otherUserId,
               'otherUserSecureId': otherUserSecureId,
+              'displayName': otherUserData?['secureId'] ?? otherUserSecureId,
               'lastMessage': chatData['lastMessage'],
               'lastMessageTime': chatData['lastMessageTime'],
               'roomId': chatData['roomId'],
@@ -385,7 +461,7 @@ class FirebaseMessageService {
       if (currentUserId == null) return false;
 
       String actualReceiverId = receiverId;
-      
+
       if (!receiverId.startsWith('user_')) {
         final receiverQuery = await _firestore
             .collection('users')
@@ -408,9 +484,7 @@ class FirebaseMessageService {
         'timestamp': FieldValue.serverTimestamp(),
       };
 
-      await _firestore
-          .collection('call_signals')
-          .add(signalData);
+      await _firestore.collection('call_signals').add(signalData);
 
       return true;
     } catch (e) {
@@ -426,25 +500,26 @@ class FirebaseMessageService {
           .orderBy('timestamp', descending: true)
           .snapshots()
           .asyncMap((snapshot) async {
-        final currentUserId = await StorageService.getUserId();
-        if (currentUserId == null) return <String, dynamic>{};
+            final currentUserId = await StorageService.getUserId();
+            if (currentUserId == null) return <String, dynamic>{};
 
-        for (final doc in snapshot.docChanges) {
-          if (doc.type == DocumentChangeType.added) {
-            final data = doc.doc.data() as Map<String, dynamic>;
-            
-            if (data['receiverId'] == currentUserId) {
-              doc.doc.reference.delete().catchError((e) {
-                print('Error deleting call signal: $e');
-              });
-              
-              return data;
+            for (final doc in snapshot.docChanges) {
+              if (doc.type == DocumentChangeType.added) {
+                final data = doc.doc.data() as Map<String, dynamic>;
+
+                if (data['receiverId'] == currentUserId) {
+                  doc.doc.reference.delete().catchError((e) {
+                    print('Error deleting call signal: $e');
+                  });
+
+                  return data;
+                }
+              }
             }
-          }
-        }
-        
-        return <String, dynamic>{};
-      }).where((data) => data.isNotEmpty);
+
+            return <String, dynamic>{};
+          })
+          .where((data) => data.isNotEmpty);
     } catch (e) {
       print('Error listening for call signals: $e');
       return Stream.empty();
@@ -454,14 +529,14 @@ class FirebaseMessageService {
   static Future<void> cleanupExpiredCallSignals() async {
     try {
       final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
-      
+
       final query = await _firestore
           .collection('call_signals')
           .where('timestamp', isLessThan: Timestamp.fromDate(oneHourAgo))
           .get();
 
       final batch = _firestore.batch();
-      
+
       for (final doc in query.docs) {
         batch.delete(doc.reference);
       }

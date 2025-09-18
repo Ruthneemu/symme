@@ -25,19 +25,35 @@ class Message {
     this.expiresInSeconds,
   });
 
+  // Replace your existing fromJson method with this:
   factory Message.fromJson(Map<String, dynamic> json) {
-    return Message(
-      id: json['id'],
-      senderId: json['senderId'],
-      receiverId: json['receiverId'],
-      content: json['content'],
-      type: MessageType.values[json['type']],
-      timestamp: DateTime.parse(json['timestamp']),
-      isRead: json['isRead'] ?? false,
-      isDelivered: json['isDelivered'] ?? false,
-      isEncrypted: json['isEncrypted'] ?? true,
-      expiresInSeconds: json['expiresInSeconds'],
-    );
+    try {
+      return Message(
+        id: json['id'] as String? ?? '',
+        senderId: json['senderId'] as String? ?? '',
+        receiverId: json['receiverId'] as String? ?? '',
+        content: json['content'] as String? ?? '',
+        type: json['type'] is int
+            ? MessageType.values[json['type']]
+            : MessageType.values.firstWhere(
+                (e) => e.name == json['type'],
+                orElse: () => MessageType.text,
+              ),
+        timestamp: json['timestamp'] is int
+            ? DateTime.fromMillisecondsSinceEpoch(json['timestamp'])
+            : json['timestamp'] is String
+            ? DateTime.parse(json['timestamp'])
+            : DateTime.now(),
+        isRead: json['isRead'] as bool? ?? false,
+        isDelivered: json['isDelivered'] as bool? ?? false,
+        isEncrypted: json['isEncrypted'] as bool? ?? true,
+        expiresInSeconds: json['expiresInSeconds'] as int?,
+      );
+    } catch (e) {
+      print('Error in Message.fromJson: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
   }
   Message copyWith({
     String? id,
@@ -65,14 +81,16 @@ class Message {
     );
   }
 
+  // Replace your existing toJson method with this:
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'senderId': senderId,
       'receiverId': receiverId,
       'content': content,
-      'type': type.index,
-      'timestamp': timestamp.toIso8601String(),
+      'type': type.index, // Keep as index to match your current fromJson
+      'timestamp': timestamp
+          .millisecondsSinceEpoch, // Store as milliseconds for Firebase
       'isRead': isRead,
       'isDelivered': isDelivered,
       'isEncrypted': isEncrypted,
