@@ -79,7 +79,7 @@ class CallService {
     }
   }
 
-  static Future<bool> initiateCall({
+  static Future<Call?> initiateCall({
     required String receiverSecureId,
     required CallType callType,
   }) async {
@@ -88,7 +88,7 @@ class CallService {
       final currentUserSecureId = await StorageService.getUserSecureId();
       
       if (currentUserId == null || currentUserSecureId == null) {
-        return false;
+        return null;
       }
 
       // Check if receiver exists and get their user ID
@@ -110,7 +110,7 @@ class CallService {
         callerId: currentUserId,
         receiverId: receiverUserId,
         type: callType,
-        status: CallStatus.outgoing,
+        status: CallStatus.incoming, // This is correct for the receiver
         timestamp: DateTime.now(),
         callerName: currentUserSecureId,
         receiverName: receiverSecureId,
@@ -122,10 +122,10 @@ class CallService {
           .doc(callId)
           .set(call.toJson());
 
-      return true;
+      return call;
     } catch (e) {
       print('Error initiating call: $e');
-      return false;
+      return null;
     }
   }
 

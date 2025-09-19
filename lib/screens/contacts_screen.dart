@@ -7,6 +7,8 @@ import '../widgets/contact_list_item.dart';
 import '../utils/helpers.dart';
 import '../utils/constants.dart';
 import 'qr_code_screen.dart';
+import '../services/call_manager.dart';
+import '../models/call.dart';
 
 class ContactsScreen extends StatefulWidget {
   final VoidCallback onContactAdded;
@@ -370,16 +372,39 @@ class _ContactsScreenState extends State<ContactsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Call ${contact.name}'),
-        content: const Text(
-          'Voice and video calling features are coming soon!',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.call),
+              title: const Text('Voice Call'),
+              onTap: () {
+                Navigator.pop(context);
+                _initiateCall(contact.publicId, CallType.audio);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam),
+              title: const Text('Video Call'),
+              onTap: () {
+                Navigator.pop(context);
+                _initiateCall(contact.publicId, CallType.video);
+              },
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
+  }
+
+  Future<void> _initiateCall(String secureId, CallType callType) async {
+    try {
+      await CallManager.instance.startCall(
+        receiverSecureId: secureId,
+        callType: callType,
+      );
+    } catch (e) {
+      Helpers.showSnackBar(context, 'Failed to start call: ${e.toString()}');
+    }
   }
 }

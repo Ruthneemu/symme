@@ -8,41 +8,58 @@ import 'storage_service.dart';
 class WebRTCService {
   static WebRTCService? _instance;
   static WebRTCService get instance => _instance ??= WebRTCService._();
-  
+
   WebRTCService._();
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
   MediaStream? _remoteStream;
-  
-  final StreamController<MediaStream> _localStreamController = StreamController.broadcast();
-  final StreamController<MediaStream> _remoteStreamController = StreamController.broadcast();
-  final StreamController<CallStatus> _callStatusController = StreamController.broadcast();
-  
+
+  final StreamController<MediaStream> _localStreamController =
+      StreamController.broadcast();
+  final StreamController<MediaStream> _remoteStreamController =
+      StreamController.broadcast();
+  final StreamController<CallStatus> _callStatusController =
+      StreamController.broadcast();
+
   Stream<MediaStream> get localStream => _localStreamController.stream;
   Stream<MediaStream> get remoteStream => _remoteStreamController.stream;
   Stream<CallStatus> get callStatus => _callStatusController.stream;
-  
+
   String? _currentCallId;
   CallType? _currentCallType;
+  String? _receiverId;
   bool _isInitialized = false;
+  Timer? _callTimeout;
 
-  // STUN servers configuration
+  // STUN servers configuration - Added more reliable servers
   final Map<String, dynamic> _iceServers = {
     'iceServers': [
       {'urls': 'stun:stun.l.google.com:19302'},
       {'urls': 'stun:stun1.l.google.com:19302'},
       {'urls': 'stun:stun2.l.google.com:19302'},
-    ]
+      {'urls': 'stun:stun.stunprotocol.org:3478'},
+      {'urls': 'stun:stun.voiparound.com'},
+    ],
+    'iceCandidatePoolSize': 10,
+  };
+
+  // Peer connection configuration
+  final Map<String, dynamic> _pcConstraints = {
+    'mandatory': {},
+    'optional': [
+      {'DtlsSrtpKeyAgreement': true},
+    ],
   };
 
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     try {
-      // Request permissions
+      // Request permissions first
       await _requestPermissions();
       _isInitialized = true;
+      print('WebRTC service initialized successfully');
     } catch (e) {
       print('WebRTC initialization error: $e');
       throw Exception('Failed to initialize WebRTC: $e');
@@ -54,14 +71,29 @@ class WebRTCService {
       // Request camera and microphone permissions
       final stream = await navigator.mediaDevices.getUserMedia({
         'audio': true,
-        'video': false, // Start with audio only for permission
+        'video': true,
       });
-      
+
       // Stop the stream immediately as we just needed permission
-      stream.getTracks().forEach((track) => track.stop());
+      for (var track in stream.getTracks()) {
+        track.stop();
+      }
+      print('Media permissions granted');
     } catch (e) {
       print('Permission request error: $e');
-      throw Exception('Microphone permission required');
+      // Try audio only
+      try {
+        final audioStream = await navigator.mediaDevices.getUserMedia({
+          'audio': true,
+          'video': false,
+        });
+        for (var track in audioStream.getTracks()) {
+          track.stop();
+        }
+        print('Audio permission granted');
+      } catch (audioError) {
+        throw Exception('Microphone permission required: $audioError');
+      }
     }
   }
 
@@ -70,21 +102,40 @@ class WebRTCService {
     required CallType callType,
   }) async {
     try {
+      print('Starting call to $receiverId, type: $callType');
       await initialize();
-      
+
       _currentCallType = callType;
       _currentCallId = DateTime.now().millisecondsSinceEpoch.toString();
-      
-      // Create peer connection
+      _receiverId = receiverId;
+
+      // Set initial status
+      _callStatusController.add(CallStatus.outgoing);
+
+      // Set call timeout (30 seconds)
+      _callTimeout?.cancel();
+      _callTimeout = Timer(const Duration(seconds: 30), () {
+        print('Call timeout reached');
+        _callStatusController.add(CallStatus.failed);
+        endCall();
+      });
+
+      // Create peer connection first
       await _createPeerConnection();
-      
+
       // Get user media
       await _getUserMedia(callType);
-      
+
       // Create offer
-      final offer = await _peerConnection!.createOffer();
+      print('Creating offer...');
+      final offer = await _peerConnection!.createOffer({
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': callType == CallType.video,
+      });
+
       await _peerConnection!.setLocalDescription(offer);
-      
+      print('Local description set');
+
       // Send call signal through Firebase
       await FirebaseMessageService.sendCallSignal(
         receiverId: receiverId,
@@ -93,10 +144,11 @@ class WebRTCService {
         data: offer.toMap(),
         callType: callType,
       );
-      
-      _callStatusController.add(CallStatus.outgoing);
+
+      print('Call offer sent successfully');
     } catch (e) {
       print('Start call error: $e');
+      _callStatusController.add(CallStatus.failed);
       await endCall();
       throw Exception('Failed to start call: $e');
     }
@@ -106,40 +158,53 @@ class WebRTCService {
     required String callId,
     required Map<String, dynamic> offerData,
     required CallType callType,
+    required String callerId,
   }) async {
     try {
+      print('Answering call $callId from $callerId');
       await initialize();
-      
+
       _currentCallId = callId;
       _currentCallType = callType;
-      
+      _receiverId = callerId;
+
+      // Set initial status
+      _callStatusController.add(CallStatus.connecting);
+
       // Create peer connection
       await _createPeerConnection();
-      
+
       // Get user media
       await _getUserMedia(callType);
-      
+
       // Set remote description (offer)
+      print('Setting remote description...');
       final offer = RTCSessionDescription(offerData['sdp'], offerData['type']);
       await _peerConnection!.setRemoteDescription(offer);
-      
+
       // Create answer
-      final answer = await _peerConnection!.createAnswer();
+      print('Creating answer...');
+      final answer = await _peerConnection!.createAnswer({
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': callType == CallType.video,
+      });
+
       await _peerConnection!.setLocalDescription(answer);
-      
+      print('Local description set for answer');
+
       // Send answer through Firebase
-      final currentUserId = await StorageService.getUserId();
       await FirebaseMessageService.sendCallSignal(
-        receiverId: callId, // Use callId to identify the caller
-        callId: _currentCallId!,
+        receiverId: callerId,
+        callId: callId,
         type: 'answer',
         data: answer.toMap(),
         callType: callType,
       );
-      
-      _callStatusController.add(CallStatus.connecting);
+
+      print('Call answered successfully');
     } catch (e) {
       print('Answer call error: $e');
+      _callStatusController.add(CallStatus.failed);
       await endCall();
       throw Exception('Failed to answer call: $e');
     }
@@ -147,28 +212,43 @@ class WebRTCService {
 
   Future<void> handleCallAnswer(Map<String, dynamic> answerData) async {
     try {
-      if (_peerConnection == null) return;
-      
-      final answer = RTCSessionDescription(answerData['sdp'], answerData['type']);
+      print('Handling call answer...');
+      if (_peerConnection == null) {
+        print('No peer connection available');
+        return;
+      }
+
+      _callTimeout?.cancel(); // Cancel timeout as call is being answered
+
+      final answer = RTCSessionDescription(
+        answerData['sdp'],
+        answerData['type'],
+      );
       await _peerConnection!.setRemoteDescription(answer);
-      
+
+      print('Remote description set for answer');
       _callStatusController.add(CallStatus.connecting);
     } catch (e) {
       print('Handle call answer error: $e');
+      _callStatusController.add(CallStatus.failed);
     }
   }
 
   Future<void> handleIceCandidate(Map<String, dynamic> candidateData) async {
     try {
-      if (_peerConnection == null) return;
-      
+      if (_peerConnection == null) {
+        print('No peer connection for ICE candidate');
+        return;
+      }
+
       final candidate = RTCIceCandidate(
         candidateData['candidate'],
         candidateData['sdpMid'],
         candidateData['sdpMLineIndex'],
       );
-      
+
       await _peerConnection!.addCandidate(candidate);
+      print('ICE candidate added: ${candidateData['candidate']}');
     } catch (e) {
       print('Handle ICE candidate error: $e');
     }
@@ -176,14 +256,19 @@ class WebRTCService {
 
   Future<void> declineCall(String callId) async {
     try {
-      await FirebaseMessageService.sendCallSignal(
-        receiverId: callId,
-        callId: callId,
-        type: 'decline',
-        data: {},
-        callType: CallType.audio,
-      );
-      
+      print('Declining call $callId');
+
+      if (_receiverId != null) {
+        await FirebaseMessageService.sendCallSignal(
+          receiverId: _receiverId!,
+          callId: callId,
+          type: 'decline',
+          data: {},
+          callType: _currentCallType ?? CallType.audio,
+        );
+      }
+
+      _callStatusController.add(CallStatus.declined);
       await endCall();
     } catch (e) {
       print('Decline call error: $e');
@@ -192,37 +277,56 @@ class WebRTCService {
 
   Future<void> endCall() async {
     try {
+      print('Ending call...');
+
+      // Cancel any timers
+      _callTimeout?.cancel();
+
       // Send end call signal if there's an active call
-      if (_currentCallId != null) {
-        await FirebaseMessageService.sendCallSignal(
-          receiverId: _currentCallId!,
-          callId: _currentCallId!,
-          type: 'end',
-          data: {},
-          callType: _currentCallType ?? CallType.audio,
-        );
+      if (_currentCallId != null && _receiverId != null) {
+        try {
+          await FirebaseMessageService.sendCallSignal(
+            receiverId: _receiverId!,
+            callId: _currentCallId!,
+            type: 'end',
+            data: {},
+            callType: _currentCallType ?? CallType.audio,
+          );
+        } catch (e) {
+          print('Error sending end call signal: $e');
+        }
       }
-      
-      // Stop local stream
+
+      // Stop and dispose of local stream
       if (_localStream != null) {
-        _localStream!.getTracks().forEach((track) => track.stop());
+        for (var track in _localStream!.getTracks()) {
+          track.stop();
+        }
+        await _localStream!.dispose();
         _localStream = null;
       }
-      
-      // Stop remote stream
+
+      // Stop and dispose of remote stream
       if (_remoteStream != null) {
-        _remoteStream!.getTracks().forEach((track) => track.stop());
+        for (var track in _remoteStream!.getTracks()) {
+          track.stop();
+        }
+        await _remoteStream!.dispose();
         _remoteStream = null;
       }
-      
+
       // Close peer connection
-      await _peerConnection?.close();
-      _peerConnection = null;
-      
+      if (_peerConnection != null) {
+        await _peerConnection!.close();
+        _peerConnection = null;
+      }
+
       _currentCallId = null;
       _currentCallType = null;
-      
+      _receiverId = null;
+
       _callStatusController.add(CallStatus.ended);
+      print('Call ended successfully');
     } catch (e) {
       print('End call error: $e');
     }
@@ -230,41 +334,57 @@ class WebRTCService {
 
   Future<void> _createPeerConnection() async {
     try {
-      _peerConnection = await createPeerConnection(_iceServers);
-      
+      print('Creating peer connection...');
+      _peerConnection = await createPeerConnection(_iceServers, _pcConstraints);
+
       // Handle ICE candidates
       _peerConnection!.onIceCandidate = (candidate) async {
-        if (candidate.candidate != null && _currentCallId != null) {
-          await FirebaseMessageService.sendCallSignal(
-            receiverId: _currentCallId!,
-            callId: _currentCallId!,
-            type: 'ice-candidate',
-            data: {
-              'candidate': candidate.candidate,
-              'sdpMid': candidate.sdpMid,
-              'sdpMLineIndex': candidate.sdpMLineIndex,
-            },
-            callType: _currentCallType ?? CallType.audio,
-          );
+        if (candidate.candidate != null &&
+            _currentCallId != null &&
+            _receiverId != null) {
+          print('Sending ICE candidate: ${candidate.candidate}');
+          try {
+            await FirebaseMessageService.sendCallSignal(
+              receiverId: _receiverId!,
+              callId: _currentCallId!,
+              type: 'ice-candidate',
+              data: {
+                'candidate': candidate.candidate,
+                'sdpMid': candidate.sdpMid,
+                'sdpMLineIndex': candidate.sdpMLineIndex,
+              },
+              callType: _currentCallType ?? CallType.audio,
+            );
+          } catch (e) {
+            print('Error sending ICE candidate: $e');
+          }
         }
       };
-      
+
       // Handle remote stream
       _peerConnection!.onAddStream = (stream) {
+        print('Remote stream added');
         _remoteStream = stream;
         _remoteStreamController.add(stream);
         _callStatusController.add(CallStatus.connected);
+        _callTimeout?.cancel(); // Cancel timeout on successful connection
       };
-      
+
       // Handle connection state changes
       _peerConnection!.onConnectionState = (state) {
-        print('Connection state: $state');
+        print('Connection state changed: $state');
         switch (state) {
           case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
             _callStatusController.add(CallStatus.connected);
+            _callTimeout?.cancel();
             break;
           case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
+            _callStatusController.add(CallStatus.ended);
+            break;
           case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
+            _callStatusController.add(CallStatus.failed);
+            endCall();
+            break;
           case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
             _callStatusController.add(CallStatus.ended);
             break;
@@ -272,6 +392,29 @@ class WebRTCService {
             break;
         }
       };
+
+      // Handle ICE connection state
+      _peerConnection!.onIceConnectionState = (state) {
+        print('ICE connection state: $state');
+        switch (state) {
+          case RTCIceConnectionState.RTCIceConnectionStateConnected:
+          case RTCIceConnectionState.RTCIceConnectionStateCompleted:
+            _callStatusController.add(CallStatus.connected);
+            _callTimeout?.cancel();
+            break;
+          case RTCIceConnectionState.RTCIceConnectionStateFailed:
+            _callStatusController.add(CallStatus.failed);
+            endCall();
+            break;
+          case RTCIceConnectionState.RTCIceConnectionStateDisconnected:
+            _callStatusController.add(CallStatus.ended);
+            break;
+          default:
+            break;
+        }
+      };
+
+      print('Peer connection created successfully');
     } catch (e) {
       print('Create peer connection error: $e');
       throw Exception('Failed to create peer connection: $e');
@@ -280,51 +423,109 @@ class WebRTCService {
 
   Future<void> _getUserMedia(CallType callType) async {
     try {
+      print('Getting user media for call type: $callType');
+
       final constraints = {
-        'audio': true,
-        'video': callType == CallType.video ? {
-          'width': 640,
-          'height': 480,
-          'frameRate': 30,
-        } : false,
+        'audio': {
+          'echoCancellation': true,
+          'noiseSuppression': true,
+          'autoGainControl': true,
+        },
+        'video': callType == CallType.video
+            ? {
+                'width': {'ideal': 640},
+                'height': {'ideal': 480},
+                'frameRate': {'ideal': 30, 'max': 30},
+                'facingMode': 'user',
+              }
+            : false,
       };
-      
+
       _localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      if (_peerConnection != null) {
-        await _peerConnection!.addStream(_localStream!);
+      print(
+        'Local stream obtained: ${_localStream?.getTracks().length} tracks',
+      );
+
+      if (_peerConnection != null && _localStream != null) {
+        // Add tracks individually for better compatibility
+        for (var track in _localStream!.getTracks()) {
+          await _peerConnection!.addTrack(track, _localStream!);
+          print('Added track: ${track.kind}');
+        }
       }
-      
-      _localStreamController.add(_localStream!);
+
+      if (_localStream != null) {
+        _localStreamController.add(_localStream!);
+      }
     } catch (e) {
       print('Get user media error: $e');
-      throw Exception('Failed to access camera/microphone: $e');
+      // Try with audio only if video fails
+      if (callType == CallType.video) {
+        try {
+          print('Retrying with audio only...');
+          _localStream = await navigator.mediaDevices.getUserMedia({
+            'audio': {
+              'echoCancellation': true,
+              'noiseSuppression': true,
+              'autoGainControl': true,
+            },
+            'video': false,
+          });
+
+          if (_peerConnection != null && _localStream != null) {
+            for (var track in _localStream!.getTracks()) {
+              await _peerConnection!.addTrack(track, _localStream!);
+            }
+          }
+
+          if (_localStream != null) {
+            _localStreamController.add(_localStream!);
+          }
+
+          // Update call type to audio
+          _currentCallType = CallType.audio;
+        } catch (audioError) {
+          throw Exception('Failed to access microphone: $audioError');
+        }
+      } else {
+        throw Exception('Failed to access microphone: $e');
+      }
     }
   }
 
   Future<void> toggleMicrophone() async {
     if (_localStream == null) return;
-    
-    final audioTrack = _localStream!.getAudioTracks().first;
-    audioTrack.enabled = !audioTrack.enabled;
+
+    final audioTracks = _localStream!.getAudioTracks();
+    if (audioTracks.isNotEmpty) {
+      final audioTrack = audioTracks.first;
+      audioTrack.enabled = !audioTrack.enabled;
+      print('Microphone ${audioTrack.enabled ? "enabled" : "disabled"}');
+    }
   }
 
   Future<void> toggleCamera() async {
     if (_localStream == null) return;
-    
+
     final videoTracks = _localStream!.getVideoTracks();
     if (videoTracks.isNotEmpty) {
       final videoTrack = videoTracks.first;
       videoTrack.enabled = !videoTrack.enabled;
+      print('Camera ${videoTrack.enabled ? "enabled" : "disabled"}');
     }
   }
 
   Future<void> switchCamera() async {
     if (_localStream == null) return;
-    
+
     final videoTracks = _localStream!.getVideoTracks();
     if (videoTracks.isNotEmpty) {
-      await Helper.switchCamera(videoTracks.first);
+      try {
+        await Helper.switchCamera(videoTracks.first);
+        print('Camera switched');
+      } catch (e) {
+        print('Error switching camera: $e');
+      }
     }
   }
 
@@ -343,10 +544,12 @@ class WebRTCService {
   bool get hasActiveCall => _currentCallId != null;
 
   String? get currentCallId => _currentCallId;
-  
+
   CallType? get currentCallType => _currentCallType;
 
   void dispose() {
+    print('Disposing WebRTC service');
+    _callTimeout?.cancel();
     endCall();
     _localStreamController.close();
     _remoteStreamController.close();
