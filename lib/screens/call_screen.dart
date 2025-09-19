@@ -1,4 +1,3 @@
-// screens/call_screen.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -6,16 +5,13 @@ import '../models/call.dart';
 import '../services/webrtc_service.dart';
 import '../services/call_service.dart';
 import '../utils/helpers.dart';
+import '../utils/colors.dart';
 
 class CallScreen extends StatefulWidget {
   final Call call;
   final bool isIncoming;
 
-  const CallScreen({
-    super.key,
-    required this.call,
-    required this.isIncoming,
-  });
+  const CallScreen({super.key, required this.call, required this.isIncoming});
 
   @override
   _CallScreenState createState() => _CallScreenState();
@@ -74,13 +70,9 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
       vsync: this,
     );
 
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
     _pulseController.repeat(reverse: true);
   }
@@ -110,48 +102,42 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
   }
 
   void _listenToStreams() {
-    _localStreamSubscription = _webRTCService.localStream.listen(
-      (stream) {
-        setState(() {
-          _localRenderer.srcObject = stream;
-        });
-      },
-    );
+    _localStreamSubscription = _webRTCService.localStream.listen((stream) {
+      setState(() {
+        _localRenderer.srcObject = stream;
+      });
+    });
 
-    _remoteStreamSubscription = _webRTCService.remoteStream.listen(
-      (stream) {
-        setState(() {
-          _remoteRenderer.srcObject = stream;
-          _isConnected = true;
-        });
-        _startCallTimer();
-      },
-    );
+    _remoteStreamSubscription = _webRTCService.remoteStream.listen((stream) {
+      setState(() {
+        _remoteRenderer.srcObject = stream;
+        _isConnected = true;
+      });
+      _startCallTimer();
+    });
   }
 
   void _listenToCallStatus() {
-    _callStatusSubscription = _webRTCService.callStatus.listen(
-      (status) {
-        setState(() {
-          _callStatus = status;
-        });
+    _callStatusSubscription = _webRTCService.callStatus.listen((status) {
+      setState(() {
+        _callStatus = status;
+      });
 
-        switch (status) {
-          case CallStatus.connected:
-            _startCallTimer();
-            break;
-          case CallStatus.ended:
-            _endCall();
-            break;
-          case CallStatus.failed:
-            _showError('Call failed');
-            _endCall();
-            break;
-          default:
-            break;
-        }
-      },
-    );
+      switch (status) {
+        case CallStatus.connected:
+          _startCallTimer();
+          break;
+        case CallStatus.ended:
+          _endCall();
+          break;
+        case CallStatus.failed:
+          _showError('Call failed');
+          _endCall();
+          break;
+        default:
+          break;
+      }
+    });
   }
 
   void _startCallTimer() {
@@ -235,15 +221,13 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: AppColors.backgroundPrimary,
       body: SafeArea(
         child: Stack(
           children: [
-            _buildVideoBackground(theme),
-            _buildTopBar(theme),
+            _buildVideoBackground(),
+            _buildTopBar(),
             _buildControlButtons(),
             if (widget.call.type == CallType.video && _isVideoEnabled)
               _buildLocalVideoPreview(),
@@ -253,7 +237,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildVideoBackground(ThemeData theme) {
+  Widget _buildVideoBackground() {
     if (widget.call.type == CallType.video && _isConnected) {
       return Positioned.fill(
         child: RTCVideoView(
@@ -264,23 +248,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     }
 
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: theme.brightness == Brightness.dark
-              ? [
-                  Colors.deepPurple.shade900,
-                  Colors.deepPurple.shade700,
-                  Colors.black
-                ]
-              : [
-                  Colors.deepPurple.shade100,
-                  Colors.deepPurple.shade200,
-                  Colors.white
-                ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      decoration: BoxDecoration(gradient: AppGradients.backgroundMain),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -289,7 +257,8 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
               animation: _pulseAnimation,
               builder: (context, child) {
                 return Transform.scale(
-                  scale: _callStatus == CallStatus.connecting ||
+                  scale:
+                      _callStatus == CallStatus.connecting ||
                           _callStatus == CallStatus.outgoing
                       ? _pulseAnimation.value
                       : 1.0,
@@ -305,7 +274,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                       style: const TextStyle(
                         fontSize: 48,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -315,25 +284,28 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
             const SizedBox(height: 24),
             Text(
               widget.call.receiverName ?? widget.call.receiverId,
-              style: theme.textTheme.titleLarge?.copyWith(
+              style: const TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Colors.white,
+                color: AppColors.textPrimary,
+                fontSize: 20,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               _getStatusText(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white70,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
               ),
             ),
             if (_callDuration > 0) ...[
               const SizedBox(height: 8),
               Text(
                 _formatDuration(_callDuration),
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: Colors.white,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.bold,
+                  fontSize: 18,
                 ),
               ),
             ],
@@ -343,7 +315,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTopBar(ThemeData theme) {
+  Widget _buildTopBar() {
     return Positioned(
       top: 16,
       left: 16,
@@ -354,7 +326,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withOpacity(0.5),
+              color: AppColors.surfaceDark.withOpacity(0.5),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -364,13 +336,13 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                   widget.call.type == CallType.video
                       ? Icons.videocam
                       : Icons.call,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   size: 16,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   widget.call.type == CallType.video ? 'Video' : 'Audio',
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: AppColors.textPrimary),
                 ),
               ],
             ),
@@ -379,17 +351,20 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.8),
+                color: AppColors.successGreen.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.lock, color: Colors.white, size: 16),
+                  Icon(Icons.lock, color: AppColors.textPrimary, size: 16),
                   SizedBox(width: 4),
                   Text(
                     'Encrypted',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -410,7 +385,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
           if (widget.isIncoming)
             _buildControlButton(
               icon: Icons.call_end,
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.errorRed,
               size: 64,
               onPressed: _declineCall,
             ),
@@ -427,7 +402,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
             ),
           _buildControlButton(
             icon: Icons.call_end,
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.errorRed,
             size: 64,
             onPressed: _endCall,
           ),
@@ -459,21 +434,15 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: backgroundColor ??
+          color:
+              backgroundColor ??
               (isActive
-                  ? Colors.white.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.5)),
+                  ? AppColors.surfaceDark.withOpacity(0.8)
+                  : AppColors.surfaceOverlay.withOpacity(0.5)),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withOpacity(0.3),
-            width: 2,
-          ),
+          border: Border.all(color: AppColors.borderSecondary, width: 2),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: size * 0.4,
-        ),
+        child: Icon(icon, color: AppColors.textPrimary, size: size * 0.4),
       ),
     );
   }
@@ -487,7 +456,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         height: 160,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white, width: 2),
+          border: Border.all(color: AppColors.borderPrimary, width: 2),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),

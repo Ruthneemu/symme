@@ -1,4 +1,6 @@
+// chat_bubble.dart
 import 'package:flutter/material.dart';
+import 'package:symme/utils/colors.dart';
 import '../models/message.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -15,55 +17,33 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bubbleColor = isMe
-        ? theme.colorScheme.primary
-        : theme.colorScheme.surfaceContainerHighest;
-    final textColor = isMe
-        ? Colors.white
-        : theme.colorScheme.onSurface;
+        ? AppColors.messageSent
+        : AppColors.messageReceived;
+    final textColor = isMe ? AppColors.textOnPrimary : AppColors.textPrimary;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
       child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
-          if (showTimestamp)
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _formatTimestamp(message.timestamp),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          if (showTimestamp) _buildTimestamp(),
           Row(
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMe) ...[
                 CircleAvatar(
-                  radius: 12,
-                  backgroundColor: theme.colorScheme.primary,
+                  radius: 14,
+                  backgroundColor: AppColors.primaryAccent,
                   child: Icon(
                     Icons.person,
                     size: 16,
-                    color: theme.colorScheme.onPrimary,
+                    color: AppColors.textOnPrimary,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -73,8 +53,10 @@ class ChatBubble extends StatelessWidget {
                   constraints: BoxConstraints(
                     maxWidth: MediaQuery.of(context).size.width * 0.75,
                   ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: bubbleColor,
                     borderRadius: BorderRadius.only(
@@ -83,47 +65,20 @@ class ChatBubble extends StatelessWidget {
                       bottomLeft: Radius.circular(isMe ? 18 : 4),
                       bottomRight: Radius.circular(isMe ? 4 : 18),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.shadowDark.withOpacity(0.2),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildMessageContent(textColor, theme),
+                      _buildMessageContent(textColor),
                       const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (message.isEncrypted)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Icon(
-                                Icons.lock,
-                                size: 12,
-                                color: textColor.withOpacity(0.7),
-                              ),
-                            ),
-                          if (message.expiresInSeconds != null)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Icon(
-                                Icons.timer,
-                                size: 12,
-                                color: textColor.withOpacity(0.7),
-                              ),
-                            ),
-                          Text(
-                            _formatTime(message.timestamp),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: textColor.withOpacity(0.7),
-                              fontSize: 11,
-                            ),
-                          ),
-                          if (isMe) ...[
-                            const SizedBox(width: 4),
-                            _buildDeliveryStatus(),
-                          ],
-                        ],
-                      ),
+                      _buildFooter(textColor),
                     ],
                   ),
                 ),
@@ -136,24 +91,82 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildMessageContent(Color textColor, ThemeData theme) {
+  /// Timestamp divider
+  Widget _buildTimestamp() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceDark.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            _formatTimestamp(message.timestamp),
+            style: TextStyle(
+              color: AppColors.textSecondary.withOpacity(0.8),
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Footer with icons + time + delivery status
+  Widget _buildFooter(Color textColor) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (message.isEncrypted)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Icon(
+              Icons.lock,
+              size: 12,
+              color: textColor.withOpacity(0.7),
+            ),
+          ),
+        if (message.expiresInSeconds != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Icon(
+              Icons.timer,
+              size: 12,
+              color: textColor.withOpacity(0.7),
+            ),
+          ),
+        Text(
+          _formatTime(message.timestamp),
+          style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11),
+        ),
+        if (isMe) ...[const SizedBox(width: 4), _buildDeliveryStatus()],
+      ],
+    );
+  }
+
+  /// Build message types
+  Widget _buildMessageContent(Color textColor) {
     switch (message.type) {
       case MessageType.text:
         return _buildTextMessage(textColor);
       case MessageType.image:
-        return _buildImageMessage(textColor, theme);
+        return _buildImageMessage(textColor);
       case MessageType.file:
-        return _buildFileMessage(textColor, theme);
+        return _buildFileMessage(textColor);
       case MessageType.voice:
-        return _buildVoiceMessage(textColor, theme);
+        return _buildVoiceMessage(textColor);
       case MessageType.system:
         return _buildSystemMessage(textColor);
     }
   }
 
   Widget _buildTextMessage(Color textColor) {
-    final isEncryptedError =
-        message.content.contains('[Encrypted Message - Cannot Decrypt]');
+    final isEncryptedError = message.content.contains(
+      '[Encrypted Message - Cannot Decrypt]',
+    );
 
     if (isEncryptedError) {
       return Column(
@@ -161,14 +174,13 @@ class ChatBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.error_outline,
-                  size: 16, color: isMe ? Colors.white : Colors.red),
+              Icon(Icons.error_outline, size: 16, color: AppColors.errorRed),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   'Unable to decrypt message',
                   style: TextStyle(
-                    color: isMe ? Colors.white : Colors.red,
+                    color: AppColors.errorRed,
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
                   ),
@@ -179,10 +191,7 @@ class ChatBubble extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'This message requires a special decryption key',
-            style: TextStyle(
-              color: textColor.withOpacity(0.7),
-              fontSize: 12,
-            ),
+            style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 12),
           ),
         ],
       );
@@ -190,14 +199,11 @@ class ChatBubble extends StatelessWidget {
 
     return SelectableText(
       message.content,
-      style: TextStyle(
-        color: textColor,
-        fontSize: 16,
-      ),
+      style: TextStyle(color: textColor, fontSize: 16),
     );
   }
 
-  Widget _buildImageMessage(Color textColor, ThemeData theme) {
+  Widget _buildImageMessage(Color textColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -205,38 +211,34 @@ class ChatBubble extends StatelessWidget {
           width: 200,
           height: 150,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
+            color: AppColors.surfaceCard,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.image,
-              size: 64, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+          child: Icon(
+            Icons.image,
+            size: 64,
+            color: AppColors.textSecondary.withOpacity(0.6),
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           'Image',
-          style: TextStyle(
-            color: textColor.withOpacity(0.7),
-            fontSize: 12,
-          ),
+          style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 12),
         ),
       ],
     );
   }
 
-  Widget _buildFileMessage(Color textColor, ThemeData theme) {
+  Widget _buildFileMessage(Color textColor) {
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isMe ? Colors.white : theme.colorScheme.primary)
-                .withOpacity(0.2),
+            color: AppColors.surfaceDark.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            Icons.insert_drive_file,
-            color: isMe ? Colors.white : theme.colorScheme.primary,
-          ),
+          child: Icon(Icons.insert_drive_file, color: AppColors.primaryCyan),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -245,10 +247,7 @@ class ChatBubble extends StatelessWidget {
             children: [
               Text(
                 'Document',
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
               ),
               Text(
                 message.content,
@@ -266,20 +265,16 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildVoiceMessage(Color textColor, ThemeData theme) {
+  Widget _buildVoiceMessage(Color textColor) {
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isMe ? Colors.white : theme.colorScheme.primary)
-                .withOpacity(0.2),
+            color: AppColors.surfaceDark.withOpacity(0.2),
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            Icons.play_arrow,
-            color: isMe ? Colors.white : theme.colorScheme.primary,
-          ),
+          child: Icon(Icons.play_arrow, color: AppColors.primaryCyan),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -354,7 +349,11 @@ class ChatBubble extends StatelessWidget {
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+    final messageDate = DateTime(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+    );
 
     if (messageDate == today) {
       return 'Today';

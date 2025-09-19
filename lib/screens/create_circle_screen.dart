@@ -26,7 +26,7 @@ class _CreateCircleScreenState extends State<CreateCircleScreen> {
     });
 
     try {
-      final circleId = await FirebaseCircleService.createCircle(
+      await FirebaseCircleService.createCircle(
         _circleNameController.text,
         widget.userSecureId,
       );
@@ -43,45 +43,63 @@ class _CreateCircleScreenState extends State<CreateCircleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create a new Circle'),
-        backgroundColor: AppColors.backgroundDark,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient:
+                AppGradients.appBarGradient, // 👈 gradient instead of solid
+          ),
+        ),
       ),
-      backgroundColor: AppColors.backgroundDark,
-      body: Padding(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppGradients.backgroundMain, // 👈 adaptive background
+        ),
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             TextField(
               controller: _circleNameController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Circle Name',
-                labelStyle: TextStyle(color: AppColors.greyLight),
+                labelStyle: TextStyle(
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                ),
                 enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.greyLight),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.outline.withOpacity(0.5),
+                  ),
                 ),
                 focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  ),
                 ),
               ),
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 20),
             _isLoading
-                ? const CircularProgressIndicator(color: AppColors.primary)
+                ? CircularProgressIndicator(color: theme.colorScheme.primary)
                 : ElevatedButton(
                     onPressed: _createCircle,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    child: const Text(
-                      'Create Circle',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    child: const Text('Create Circle'),
                   ),
           ],
         ),

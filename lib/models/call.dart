@@ -1,8 +1,4 @@
-// models/call.dart
-enum CallType {
-  audio,
-  video,
-}
+enum CallType { audio, video }
 
 enum CallStatus {
   outgoing,
@@ -25,6 +21,8 @@ class Call {
   final int? duration; // in seconds
   final String? callerName;
   final String? receiverName;
+  final Map<String, dynamic>?
+  metadata; // Added for storing offer data and other call info
 
   Call({
     required this.id,
@@ -36,6 +34,7 @@ class Call {
     this.duration,
     this.callerName,
     this.receiverName,
+    this.metadata, // Added parameter
   });
 
   factory Call.fromJson(Map<String, dynamic> json) {
@@ -55,6 +54,7 @@ class Call {
       duration: json['duration'],
       callerName: json['callerName'],
       receiverName: json['receiverName'],
+      metadata: json['metadata'] as Map<String, dynamic>?, // Added field
     );
   }
 
@@ -69,6 +69,7 @@ class Call {
       'duration': duration,
       'callerName': callerName,
       'receiverName': receiverName,
+      'metadata': metadata, // Added field
     };
   }
 
@@ -82,6 +83,7 @@ class Call {
     int? duration,
     String? callerName,
     String? receiverName,
+    Map<String, dynamic>? metadata, // Added parameter
   }) {
     return Call(
       id: id ?? this.id,
@@ -93,15 +95,16 @@ class Call {
       duration: duration ?? this.duration,
       callerName: callerName ?? this.callerName,
       receiverName: receiverName ?? this.receiverName,
+      metadata: metadata ?? this.metadata, // Added field
     );
   }
 
   String get formattedDuration {
     if (duration == null) return '';
-    
+
     final minutes = duration! ~/ 60;
     final seconds = duration! % 60;
-    
+
     if (minutes > 0) {
       return '${minutes}m ${seconds}s';
     } else {

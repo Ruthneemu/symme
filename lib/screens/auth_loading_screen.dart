@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:symme/screens/home_screen.dart';
+import 'package:symme/services/call_manager.dart';
 import 'package:symme/services/firebase_auth_service.dart';
 import 'package:symme/utils/colors.dart';
 import 'package:symme/utils/helpers.dart';
@@ -19,7 +20,6 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
   @override
   void initState() {
     super.initState();
-    // We will now wait for the user to press the button.
   }
 
   Future<void> _updateProgress(String status, double progress) async {
@@ -29,7 +29,6 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
         _progress = progress;
       });
     }
-    // Add a small delay to make the progress visible
     await Future.delayed(const Duration(milliseconds: 300));
   }
 
@@ -48,9 +47,11 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
         }
       }
 
-      await _updateProgress('Verifying account...', 0.9);
+      await _updateProgress('Verifying account...', 0.8);
 
-      // Finalizing setup
+      await _updateProgress('Setting up calling service...', 0.9);
+      await CallManager.instance.initialize(context);
+
       await _updateProgress('Finalizing setup...', 1.0);
       await Future.delayed(const Duration(milliseconds: 200));
 
@@ -64,7 +65,7 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
         setState(() {
           _status = 'Failed to set up account. Please restart the app.';
           _progress = 0.0;
-          _isSettingUp = false; // Allow user to try again
+          _isSettingUp = false;
         });
         Helpers.showSnackBar(context, 'Error: $e');
       }
@@ -74,7 +75,7 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: AppColors.backgroundPrimary,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(40.0),
@@ -88,12 +89,16 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.security_rounded, size: 100, color: AppColors.primary),
+        const Icon(
+          Icons.security_rounded,
+          size: 100,
+          color: AppColors.primaryCyan,
+        ),
         const SizedBox(height: 24),
         const Text(
           'Welcome to Symme',
           style: TextStyle(
-            color: AppColors.primary,
+            color: AppColors.primaryCyan,
             fontSize: 28,
             fontWeight: FontWeight.bold,
           ),
@@ -102,14 +107,14 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
         const SizedBox(height: 12),
         const Text(
           'A secure and private messaging app where your conversations are always end-to-end encrypted.',
-          style: TextStyle(color: AppColors.greyLight, fontSize: 16),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 40),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
+            backgroundColor: AppColors.buttonPrimary,
+            foregroundColor: AppColors.textOnPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
             textStyle: const TextStyle(
               fontSize: 18,
@@ -138,7 +143,7 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
         Text(
           '${(_progress * 100).toInt()}%',
           style: const TextStyle(
-            color: AppColors.primary,
+            color: AppColors.primaryCyan,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
@@ -146,14 +151,16 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen> {
         const SizedBox(height: 12),
         LinearProgressIndicator(
           value: _progress,
-          backgroundColor: AppColors.backgroundLight,
-          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+          backgroundColor: AppColors.surfaceCard,
+          valueColor: const AlwaysStoppedAnimation<Color>(
+            AppColors.primaryCyan,
+          ),
           minHeight: 6,
         ),
         const SizedBox(height: 20),
         Text(
           _status,
-          style: const TextStyle(color: AppColors.greyLight, fontSize: 16),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 16),
           textAlign: TextAlign.center,
         ),
       ],

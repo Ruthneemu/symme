@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:symme/models/user.dart';
 import 'package:symme/services/firebase_user_service.dart';
-import 'package:symme/utils/colors.dart';
 
 class SearchUserScreen extends StatefulWidget {
   const SearchUserScreen({super.key});
 
   @override
-  _SearchUserScreenState createState() => _SearchUserScreenState();
+  State<SearchUserScreen> createState() => _SearchUserScreenState();
 }
 
 class _SearchUserScreenState extends State<SearchUserScreen> {
@@ -17,15 +16,11 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
 
   Future<void> _searchUsers(String query) async {
     if (query.isEmpty) {
-      setState(() {
-        _searchResults = [];
-      });
+      setState(() => _searchResults = []);
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final results = await FirebaseUserService.searchUsersByName(query);
 
@@ -37,45 +32,49 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search for a user'),
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: theme.colorScheme.surface,
       ),
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: theme.colorScheme.background,
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
               onChanged: _searchUsers,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Search by name',
-                labelStyle: TextStyle(color: AppColors.greyLight),
+                labelStyle: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.greyLight),
+                  borderSide: BorderSide(color: theme.colorScheme.outline),
                 ),
                 focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(color: theme.colorScheme.primary),
                 ),
               ),
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: theme.colorScheme.onSurface),
             ),
           ),
           _isLoading
-              ? const CircularProgressIndicator(color: AppColors.primary)
+              ? CircularProgressIndicator(color: theme.colorScheme.primary)
               : Expanded(
                   child: ListView.builder(
                     itemCount: _searchResults.length,
                     itemBuilder: (context, index) {
                       final user = _searchResults[index];
                       return ListTile(
-                        title: Text(user.name,
-                            style: const TextStyle(color: Colors.white)),
-                        onTap: () {
-                          Navigator.of(context).pop(user);
-                        },
+                        title: Text(
+                          user.name,
+                          style: TextStyle(color: theme.colorScheme.onSurface),
+                        ),
+                        onTap: () => Navigator.of(context).pop(user),
                       );
                     },
                   ),

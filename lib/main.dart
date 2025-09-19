@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'screens/auth_loading_screen.dart';
 import 'firebase_options.dart';
+import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,19 +11,6 @@ void main() async {
   runApp(const SymmeApp());
 }
 
-/// --- THEME PROVIDER ---
-class ThemeProvider extends ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.system;
-
-  ThemeMode get themeMode => _themeMode;
-
-  void toggleTheme(bool isDark) {
-    _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-    notifyListeners();
-  }
-}
-
-/// --- MAIN APP ---
 class SymmeApp extends StatelessWidget {
   const SymmeApp({super.key});
 

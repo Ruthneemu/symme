@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/colors.dart';
 import '../utils/helpers.dart';
 
 class IdentityCard extends StatelessWidget {
@@ -13,17 +14,26 @@ class IdentityCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.all(16),
       elevation: 4,
+      color: AppColors.surfaceCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.borderSecondary),
+      ),
       child: InkWell(
         onTap: onTap ?? () => _copyToClipboard(context),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               const CircleAvatar(
-                backgroundColor: Colors.deepPurple,
+                backgroundColor: AppColors.primaryCyanDark,
                 radius: 24,
-                child: Icon(Icons.person, color: Colors.white, size: 28),
+                child: Icon(
+                  Icons.person,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -32,9 +42,9 @@ class IdentityCard extends StatelessWidget {
                   children: [
                     Text(
                       'Your Secure ID',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -43,19 +53,24 @@ class IdentityCard extends StatelessWidget {
                           ?.copyWith(
                             fontWeight: FontWeight.bold,
                             fontFamily: 'monospace',
+                            color: AppColors.textPrimary,
                           ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Tap to copy',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.blue),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.primaryCyan,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.security, color: Colors.green, size: 32),
+              const Icon(
+                Icons.security,
+                color: AppColors.onlineGreen,
+                size: 32,
+              ),
             ],
           ),
         ),

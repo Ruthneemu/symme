@@ -5,6 +5,7 @@ import '../services/firebase_message_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/chat_bubble.dart';
 import '../utils/helpers.dart';
+import '../utils/colors.dart';
 
 class ChatScreen extends StatefulWidget {
   final String otherUserSecureId;
@@ -80,18 +81,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _listenToMessages() {
     if (_otherUserId == null) return;
 
-    _messagesSubscription =
-        FirebaseMessageService.getMessages(_otherUserId!).listen((messages) {
-      if (mounted) {
-        setState(() => _messages = messages);
-        _scrollToBottom();
-      }
-    }, onError: (error) {
-      print('Error listening to messages: $error');
-      if (mounted) {
-        Helpers.showSnackBar(context, 'Error loading messages: $error');
-      }
-    });
+    _messagesSubscription = FirebaseMessageService.getMessages(_otherUserId!)
+        .listen(
+          (messages) {
+            if (mounted) {
+              setState(() => _messages = messages);
+              _scrollToBottom();
+            }
+          },
+          onError: (error) {
+            print('Error listening to messages: $error');
+            if (mounted) {
+              Helpers.showSnackBar(context, 'Error loading messages: $error');
+            }
+          },
+        );
   }
 
   Future<void> _loadDisappearingTimer() async {
@@ -152,11 +156,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Disappearing Messages'),
+        backgroundColor: AppColors.surfaceCard,
+        title: const Text(
+          'Disappearing Messages',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Set timer for new messages:'),
+            const Text(
+              'Set timer for new messages:',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 16),
             ...[
               {'label': 'Off', 'value': 0},
@@ -166,7 +177,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               {'label': '30 Days', 'value': 2592000},
             ].map(
               (option) => RadioListTile<int>(
-                title: Text(option['label'] as String),
+                activeColor: AppColors.primaryCyan,
+                title: Text(
+                  option['label'] as String,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
                 value: option['value'] as int,
                 groupValue: _disappearingTimer,
                 onChanged: (value) {
@@ -181,8 +196,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel'),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
         ],
       ),
@@ -210,9 +227,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: AppColors.backgroundPrimary,
       appBar: AppBar(
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: AppGradients.appBarGradient),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -221,15 +241,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: AppColors.textOnPrimary,
                 fontFamily: 'monospace',
               ),
             ),
             if (_isOtherUserOnline)
-              Text('Online', style: TextStyle(fontSize: 12, color: Colors.green)),
+              const Text(
+                'Online',
+                style: TextStyle(fontSize: 12, color: Colors.green),
+              ),
           ],
         ),
         actions: [
           PopupMenuButton<String>(
+            color: AppColors.surfaceCard,
             onSelected: (value) {
               if (value == 'disappearing') {
                 _showDisappearingMessagesDialog();
@@ -241,20 +266,33 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               PopupMenuItem(
                 value: 'disappearing',
                 child: ListTile(
-                  leading: Icon(Icons.timer, color: theme.colorScheme.secondary),
-                  title: const Text('Disappearing Messages'),
+                  leading: const Icon(
+                    Icons.timer,
+                    color: AppColors.primaryCyan,
+                  ),
+                  title: const Text(
+                    'Disappearing Messages',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
                   subtitle: Text(
                     _disappearingTimer > 0
                         ? _getTimerText(_disappearingTimer)
                         : 'Off',
+                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
               ),
               const PopupMenuItem(
                 value: 'clear_chat',
                 child: ListTile(
-                  leading: Icon(Icons.delete_outline, color: Colors.red),
-                  title: Text('Clear Chat'),
+                  leading: Icon(
+                    Icons.delete_outline,
+                    color: AppColors.errorRed,
+                  ),
+                  title: Text(
+                    'Clear Chat',
+                    style: TextStyle(color: AppColors.errorRed),
+                  ),
                 ),
               ),
             ],
@@ -262,22 +300,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.primaryCyan,
+                ),
+              ),
+            )
           : Column(
               children: [
                 if (_disappearingTimer > 0)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
-                    color: theme.colorScheme.secondary.withOpacity(0.1),
+                    color: AppColors.primaryCyan.withOpacity(0.1),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.timer, size: 16, color: theme.colorScheme.secondary),
+                        const Icon(
+                          Icons.timer,
+                          size: 16,
+                          color: AppColors.primaryCyan,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'Messages disappear after ${_getTimerText(_disappearingTimer)}',
-                          style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primaryCyan,
+                          ),
                         ),
                       ],
                     ),
@@ -285,10 +336,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 Expanded(child: _buildMessagesList()),
                 Container(
                   decoration: BoxDecoration(
-                    color: theme.cardColor,
+                    color: AppColors.surfaceCard,
                     boxShadow: [
                       BoxShadow(
-                        color: theme.shadowColor.withOpacity(0.1),
+                        color: Colors.black.withOpacity(0.05),
                         blurRadius: 6,
                         offset: const Offset(0, -2),
                       ),
@@ -306,13 +357,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock, size: 64, color: Theme.of(context).disabledColor),
-            const SizedBox(height: 16),
-            const Text('This chat is end-to-end encrypted', style: TextStyle(fontSize: 16)),
-            const SizedBox(height: 8),
-            Text('Send your first message to start the conversation',
-                style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 14)),
+          children: const [
+            Icon(Icons.lock, size: 64, color: AppColors.textSecondary),
+            SizedBox(height: 16),
+            Text(
+              'This chat is end-to-end encrypted',
+              style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Send your first message to start the conversation',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            ),
           ],
         ),
       );
@@ -350,9 +406,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
+                color: AppColors.backgroundSecondary,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Theme.of(context).disabledColor),
+                border: Border.all(color: AppColors.divider),
               ),
               child: Row(
                 children: [
@@ -361,8 +417,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     child: TextField(
                       controller: _messageController,
                       focusNode: _messageFocusNode,
+                      style: const TextStyle(color: AppColors.textPrimary),
                       decoration: const InputDecoration(
                         hintText: 'Type a message...',
+                        hintStyle: TextStyle(color: AppColors.textSecondary),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -370,15 +428,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       onSubmitted: (_) => _sendMessage(),
                       maxLines: null,
                       maxLength: 4096,
-                      buildCounter: (_,
-                              {required currentLength,
-                              maxLength,
-                              required isFocused}) =>
-                          null,
+                      buildCounter:
+                          (
+                            _, {
+                            required currentLength,
+                            maxLength,
+                            required isFocused,
+                          }) => null,
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.attach_file, color: Theme.of(context).colorScheme.secondary),
+                    icon: const Icon(
+                      Icons.attach_file,
+                      color: AppColors.primaryCyan,
+                    ),
                     onPressed: _showAttachmentOptions,
                   ),
                 ],
@@ -387,6 +450,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
           const SizedBox(width: 8),
           FloatingActionButton(
+            backgroundColor: AppColors.primaryCyan,
+            foregroundColor: AppColors.textOnPrimary,
             mini: true,
             onPressed: _isSending ? null : _sendMessage,
             child: _isSending
@@ -395,7 +460,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.textOnPrimary,
+                      ),
                     ),
                   )
                 : const Icon(Icons.send),
@@ -407,13 +474,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _showAttachmentOptions() {
     showModalBottomSheet(
+      backgroundColor: AppColors.surfaceCard,
       context: context,
       builder: (context) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Attachment Options', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Attachment Options',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -440,14 +515,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+              decoration: const BoxDecoration(
+                color: AppColors.backgroundSecondary,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 32, color: Theme.of(context).colorScheme.secondary),
+              child: Icon(icon, size: 32, color: AppColors.primaryCyan),
             ),
             const SizedBox(height: 8),
-            Text(label),
+            Text(label, style: const TextStyle(color: AppColors.textPrimary)),
           ],
         ),
       ),
@@ -463,17 +538,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Chat', style: TextStyle(color: Colors.red)),
-        content: const Text('This will delete all messages in this chat. This action cannot be undone.'),
+        backgroundColor: AppColors.surfaceCard,
+        title: const Text(
+          'Clear Chat',
+          style: TextStyle(color: AppColors.errorRed),
+        ),
+        content: const Text(
+          'This will delete all messages in this chat. This action cannot be undone.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.errorRed,
+              foregroundColor: AppColors.textOnPrimary,
             ),
             onPressed: () {
               Navigator.pop(context);

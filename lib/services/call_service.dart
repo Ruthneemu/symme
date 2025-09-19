@@ -1,6 +1,8 @@
 // services/call_service.dart
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:symme/services/firebase_auth_service.dart';
+import 'package:symme/services/firebase_message_service.dart';
 import '../models/call.dart';
 import '../services/storage_service.dart';
 
@@ -79,31 +81,61 @@ class CallService {
     }
   }
 
-  static Future<Call?> initiateCall({
+static Future<Call?> initiateCall({
     required String receiverSecureId,
     required CallType callType,
   }) async {
     try {
+      print('Initiating call to secure ID: $receiverSecureId');
+      
       final currentUserId = await StorageService.getUserId();
       final currentUserSecureId = await StorageService.getUserSecureId();
       
       if (currentUserId == null || currentUserSecureId == null) {
+        print('ERROR: Missing current user data - userId: $currentUserId, secureId: $currentUserSecureId');
         return null;
       }
 
-      // Check if receiver exists and get their user ID
-      final receiverQuery = await _firestore
-          .collection('users')
-          .where('secureId', isEqualTo: receiverSecureId)
-          .limit(1)
-          .get();
+      print('Current user: $currentUserId, secure ID: $currentUserSecureId');
 
-      if (receiverQuery.docs.isEmpty) {
-        throw Exception('User not found');
+      // First, try to find the user using Firebase Realtime Database (from your auth service)
+      Map<String, dynamic>? receiverData;
+      String? receiverUserId;
+      
+      try {
+        receiverData = await FirebaseAuthService.getUserBySecureId(receiverSecureId);
+        receiverUserId = receiverData?['userId'] as String?;
+        print('Found receiver via FirebaseAuthService: $receiverUserId');
+            } catch (e) {
+        print('Error getting user from FirebaseAuthService: $e');
       }
 
-      final receiverUserId = receiverQuery.docs.first.id;
+      // If not found via auth service, try Firestore as fallback
+      if (receiverUserId == null) {
+        print('Trying Firestore lookup for secure ID: $receiverSecureId');
+        try {
+          final receiverQuery = await _firestore
+              .collection('users')
+              .where('secureId', isEqualTo: receiverSecureId)
+              .limit(1)
+              .get();
+
+          if (receiverQuery.docs.isNotEmpty) {
+            receiverUserId = receiverQuery.docs.first.id;
+            print('Found receiver via Firestore: $receiverUserId');
+          }
+        } catch (e) {
+          print('Error querying Firestore: $e');
+        }
+      }
+
+      if (receiverUserId == null) {
+        print('ERROR: Receiver not found for secure ID: $receiverSecureId');
+        throw Exception('User not found with secure ID: $receiverSecureId');
+      }
+
       final callId = DateTime.now().millisecondsSinceEpoch.toString();
+      print('Creating call with ID: $callId');
 
       final call = Call(
         id: callId,
@@ -116,11 +148,28 @@ class CallService {
         receiverName: receiverSecureId,
       );
 
-      // Save call record
+      // Save call record to Firestore
+      print('Saving call record to Firestore...');
       await _firestore
           .collection('calls')
           .doc(callId)
           .set(call.toJson());
+
+      print('Call record saved successfully');
+
+      // Send the call signal immediately
+      print('Sending call signal...');
+      final signalSent = await FirebaseMessageService.sendCallSignal(
+        receiverId: receiverUserId,
+        callId: callId,
+        type: 'offer',
+        data: {}, // We'll send the actual offer data from WebRTC service
+        callType: callType,
+      );
+
+      if (!signalSent) {
+        print('Warning: Failed to send initial call signal');
+      }
 
       return call;
     } catch (e) {
@@ -128,7 +177,6 @@ class CallService {
       return null;
     }
   }
-
   static Future<bool> answerCall(String callId) async {
     try {
       await _firestore

@@ -93,9 +93,9 @@
     },
     {
       "name": "device_info_plus",
-      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/device_info_plus-10.1.2",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/device_info_plus-11.5.0",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.7"
     },
     {
       "name": "device_info_plus_platform_interface",
@@ -597,9 +597,9 @@
     },
     {
       "name": "win32_registry",
-      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/win32_registry-1.1.5",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/win32_registry-2.1.0",
       "packageUri": "lib/",
-      "languageVersion": "3.4"
+      "languageVersion": "3.7"
     },
     {
       "name": "xdg_directories",

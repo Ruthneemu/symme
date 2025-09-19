@@ -83,8 +83,9 @@ class FirebaseMessageService {
       receiverMessageData['iv'] = encryptionResult['iv'];
       receiverMessageData['senderSecureId'] = senderSecureId;
       receiverMessageData['receiverSecureId'] = receiverSecureId;
-      receiverMessageData['expiresAt'] =
-          now.add(Duration(seconds: expirationSeconds)).millisecondsSinceEpoch;
+      receiverMessageData['expiresAt'] = now
+          .add(Duration(seconds: expirationSeconds))
+          .millisecondsSinceEpoch;
 
       // 3. Create the message payload for the SENDER (unencrypted)
       final senderMessage = Message(
@@ -100,8 +101,9 @@ class FirebaseMessageService {
       final senderMessageData = senderMessage.toJson();
       senderMessageData['senderSecureId'] = senderSecureId;
       senderMessageData['receiverSecureId'] = receiverSecureId;
-      senderMessageData['expiresAt'] =
-          now.add(Duration(seconds: expirationSeconds)).millisecondsSinceEpoch;
+      senderMessageData['expiresAt'] = now
+          .add(Duration(seconds: expirationSeconds))
+          .millisecondsSinceEpoch;
 
       // 4. Atomically write both messages to the database
       await Future.wait([
@@ -154,10 +156,7 @@ class FirebaseMessageService {
       final otherUserId = otherUserData['userId'] as String;
 
       // Listen to messages in the current user's chat path
-      return _database
-          .child('messages/${currentUser.uid}/$otherUserId')
-          .onValue
-          .asyncMap((
+      return _database.child('messages/${currentUser.uid}/$otherUserId').onValue.asyncMap((
         event,
       ) async {
         final data = event.snapshot.value as Map<dynamic, dynamic>?;
@@ -182,7 +181,8 @@ class FirebaseMessageService {
             // A message needs decryption if:
             // 1. It's marked as encrypted AND
             // 2. The current user is NOT the sender (receiver needs to decrypt)
-            final needsDecryption = messageData['isEncrypted'] == true &&
+            final needsDecryption =
+                messageData['isEncrypted'] == true &&
                 messageData['senderId'] != currentUserId;
 
             if (needsDecryption) {
@@ -201,10 +201,10 @@ class FirebaseMessageService {
                 // Use the proper decryption method
                 final decryptedContent =
                     CryptoService.decryptMessageWithCombination(
-                  messageData['content'],
-                  messageData['encryptedCombination'],
-                  privateKey,
-                );
+                      messageData['content'],
+                      messageData['encryptedCombination'],
+                      privateKey,
+                    );
 
                 if (decryptedContent != null) {
                   print(
@@ -289,8 +289,8 @@ class FirebaseMessageService {
         'displayName': displayName, // Add display name
         'lastMessage': lastMessage.type == MessageType.text
             ? lastMessage.content.length > 50
-                ? '${lastMessage.content.substring(0, 50)}...'
-                : lastMessage.content
+                  ? '${lastMessage.content.substring(0, 50)}...'
+                  : lastMessage.content
             : '[${lastMessage.type.name}]',
         'lastMessageTime': lastMessage.timestamp.millisecondsSinceEpoch,
         'updatedAt': ServerValue.timestamp,
@@ -323,8 +323,9 @@ class FirebaseMessageService {
     if (currentUser == null) return;
 
     try {
-      final snapshot =
-          await _database.child('messages/${currentUser.uid}').once();
+      final snapshot = await _database
+          .child('messages/${currentUser.uid}')
+          .once();
       final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
 
       if (data != null) {
@@ -447,7 +448,9 @@ class FirebaseMessageService {
     }
   }
 
-  // Call signal methods remain the same...
+  // Updated call signal methods for your existing FirebaseMessageService
+
+  // FIXED: Call signal methods with better error handling and flow
   static Future<bool> sendCallSignal({
     required String receiverId,
     required String callId,
@@ -456,20 +459,29 @@ class FirebaseMessageService {
     required CallType callType,
   }) async {
     try {
+      print('Sending call signal: $type for call $callId to $receiverId');
+
       final currentUserId = await StorageService.getUserId();
-      if (currentUserId == null) return false;
+      if (currentUserId == null) {
+        print('No current user ID to send call signal');
+        return false;
+      }
 
       String actualReceiverId = receiverId;
 
-      if (!receiverId.startsWith('user_')) {
-        final receiverQuery = await _firestore
-            .collection('users')
-            .where('secureId', isEqualTo: receiverId)
-            .limit(1)
-            .get();
-
-        if (receiverQuery.docs.isNotEmpty) {
-          actualReceiverId = receiverQuery.docs.first.id;
+      // If receiverId looks like a secure ID, convert it to user ID
+      if (receiverId.length == 12 &&
+          RegExp(r'^[A-Z0-9]+$').hasMatch(receiverId)) {
+        print('Converting secure ID to user ID: $receiverId');
+        final receiverData = await FirebaseAuthService.getUserBySecureId(
+          receiverId,
+        );
+        if (receiverData != null) {
+          actualReceiverId = receiverData['userId'] as String;
+          print('Found user ID: $actualReceiverId');
+        } else {
+          print('Could not find user for secure ID: $receiverId');
+          return false;
         }
       }
 
@@ -481,9 +493,11 @@ class FirebaseMessageService {
         'data': data,
         'callType': callType.toString().split('.').last,
         'timestamp': FieldValue.serverTimestamp(),
+        'processed': false, // Add flag to track processing
       };
 
       await _firestore.collection('call_signals').add(signalData);
+      print('Call signal sent successfully: $type');
 
       return true;
     } catch (e) {
@@ -493,35 +507,75 @@ class FirebaseMessageService {
   }
 
   static Stream<Map<String, dynamic>> listenForCallSignals() {
-    try {
-      return _firestore
-          .collection('call_signals')
-          .orderBy('timestamp', descending: true)
-          .snapshots()
-          .asyncMap((snapshot) async {
-        final currentUserId = await StorageService.getUserId();
-        if (currentUserId == null) return <String, dynamic>{};
+    print('Setting up call signals listener');
 
-        for (final doc in snapshot.docChanges) {
-          if (doc.type == DocumentChangeType.added) {
-            final data = doc.doc.data() as Map<String, dynamic>;
+    final StreamController<Map<String, dynamic>> controller =
+        StreamController<Map<String, dynamic>>.broadcast();
 
-            if (data['receiverId'] == currentUserId) {
-              doc.doc.reference.delete().catchError((e) {
-                print('Error deleting call signal: $e');
-              });
+    StreamSubscription<QuerySnapshot>? subscription;
 
-              return data;
-            }
+    // Get current user ID first
+    StorageService.getUserId()
+        .then((currentUserId) {
+          if (currentUserId == null) {
+            print('No current user ID for call signals');
+            controller.close();
+            return;
           }
-        }
 
-        return <String, dynamic>{};
-      }).where((data) => data.isNotEmpty);
-    } catch (e) {
-      print('Error listening for call signals: $e');
-      return const Stream.empty();
-    }
+          print('Listening for call signals for user: $currentUserId');
+
+          subscription = _firestore
+              .collection('call_signals')
+              .where('receiverId', isEqualTo: currentUserId)
+              .where('processed', isEqualTo: false)
+              .orderBy('timestamp', descending: true)
+              .limit(10) // Limit to recent signals
+              .snapshots()
+              .listen(
+                (snapshot) {
+                  for (final change in snapshot.docChanges) {
+                    if (change.type == DocumentChangeType.added) {
+                      final data = change.doc.data() as Map<String, dynamic>;
+                      print(
+                        'Received call signal: ${data['type']} for call ${data['callId']}',
+                      );
+
+                      // Mark as processed and delete
+                      change.doc.reference.update({'processed': true}).then((
+                        _,
+                      ) {
+                        // Delete after a delay to ensure processing is complete
+                        Future.delayed(const Duration(seconds: 5), () {
+                          change.doc.reference.delete().catchError((e) {
+                            print('Error deleting processed call signal: $e');
+                          });
+                        });
+                      });
+
+                      // Add to stream
+                      controller.add(data);
+                    }
+                  }
+                },
+                onError: (error) {
+                  print('Error in call signals stream: $error');
+                  controller.addError(error);
+                },
+              );
+        })
+        .catchError((error) {
+          print('Error getting user ID for call signals: $error');
+          controller.addError(error);
+        });
+
+    // Handle stream disposal
+    controller.onCancel = () {
+      subscription?.cancel();
+      print('Call signals listener cancelled');
+    };
+
+    return controller.stream;
   }
 
   static Future<void> cleanupExpiredCallSignals() async {
@@ -543,6 +597,36 @@ class FirebaseMessageService {
       print('Cleaned up ${query.docs.length} expired call signals');
     } catch (e) {
       print('Error cleaning up expired call signals: $e');
+    }
+  }
+
+  // Add method to clean up failed call attempts
+  static Future<void> cleanupFailedCalls() async {
+    try {
+      final currentUserId = await StorageService.getUserId();
+      if (currentUserId == null) return;
+
+      final tenMinutesAgo = DateTime.now().subtract(
+        const Duration(minutes: 10),
+      );
+
+      // Clean up old outgoing call signals that were never answered
+      final query = await _firestore
+          .collection('call_signals')
+          .where('senderId', isEqualTo: currentUserId)
+          .where('type', isEqualTo: 'offer')
+          .where('timestamp', isLessThan: Timestamp.fromDate(tenMinutesAgo))
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in query.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+      print('Cleaned up ${query.docs.length} failed call attempts');
+    } catch (e) {
+      print('Error cleaning up failed calls: $e');
     }
   }
 }

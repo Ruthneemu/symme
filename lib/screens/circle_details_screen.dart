@@ -27,7 +27,9 @@ class _CircleDetailsScreenState extends State<CircleDetailsScreen> {
   Future<void> _addMember(AppUser user) async {
     if (!_currentCircle.members.contains(user.secureId)) {
       await FirebaseCircleService.addMemberToCircle(
-          _currentCircle.id, user.secureId);
+        _currentCircle.id,
+        user.secureId,
+      );
       setState(() {
         _currentCircle.members.add(user.secureId);
       });
@@ -36,12 +38,21 @@ class _CircleDetailsScreenState extends State<CircleDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentCircle.name),
-        backgroundColor: AppColors.backgroundDark,
+        title: Text(
+          _currentCircle.name,
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.onPrimary,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: AppGradients.appBarGradient),
+        ),
       ),
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: ListView.builder(
         itemCount: _currentCircle.members.length,
         itemBuilder: (context, index) {
@@ -50,25 +61,26 @@ class _CircleDetailsScreenState extends State<CircleDetailsScreen> {
             future: FirebaseUserService.getUserBySecureId(memberId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const ListTile(
-                  title:
-                      Text('Loading...', style: TextStyle(color: Colors.white)),
+                return ListTile(
+                  title: Text('Loading...', style: theme.textTheme.bodyLarge),
                 );
               }
 
               if (!snapshot.hasData || snapshot.data == null) {
                 return ListTile(
-                  title: Text(memberId,
-                      style: const TextStyle(color: Colors.white)),
-                  subtitle: const Text('User not found',
-                      style: TextStyle(color: Colors.red)),
+                  title: Text(memberId, style: theme.textTheme.bodyLarge),
+                  subtitle: Text(
+                    'User not found',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
                 );
               }
 
               final user = snapshot.data!;
               return ListTile(
-                title: Text(user.name,
-                    style: const TextStyle(color: Colors.white)),
+                title: Text(user.name, style: theme.textTheme.bodyLarge),
               );
             },
           );
@@ -77,16 +89,14 @@ class _CircleDetailsScreenState extends State<CircleDetailsScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final selectedUser = await Navigator.of(context).push<AppUser>(
-            MaterialPageRoute(
-              builder: (context) => const SearchUserScreen(),
-            ),
+            MaterialPageRoute(builder: (context) => const SearchUserScreen()),
           );
 
           if (selectedUser != null) {
             await _addMember(selectedUser);
           }
         },
-        backgroundColor: AppColors.primary,
+        backgroundColor: theme.colorScheme.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

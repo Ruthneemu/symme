@@ -16,21 +16,24 @@ class CirclesTab extends StatefulWidget {
 class _CirclesTabState extends State<CirclesTab> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.colorScheme.background,
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseCircleService.getCircles(widget.userSecureId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
-                child: CircularProgressIndicator(
-                    color: Theme.of(context).primaryColor));
+              child: CircularProgressIndicator(color: theme.colorScheme.primary),
+            );
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
                 'You are not a part of any circles yet.',
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface.withOpacity(0.6)),
               ),
             );
           }
@@ -43,21 +46,41 @@ class _CirclesTabState extends State<CirclesTab> {
             itemCount: circles.length,
             itemBuilder: (context, index) {
               final circle = circles[index];
-              return ListTile(
-                title: Text(circle.name),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => CircleDetailsScreen(circle: circle),
+              return Card(
+                color: theme.colorScheme.surface,
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ListTile(
+                  title: Text(
+                    circle.name,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
-                  );
-                },
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CircleDetailsScreen(circle: circle),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: theme.colorScheme.primary,
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -66,7 +89,7 @@ class _CirclesTabState extends State<CirclesTab> {
             ),
           );
         },
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add, color: theme.colorScheme.onPrimary),
       ),
     );
   }

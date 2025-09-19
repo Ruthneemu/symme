@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../models/call.dart';
 import 'firebase_message_service.dart';
-import 'storage_service.dart';
 
 class WebRTCService {
   static WebRTCService? _instance;
@@ -29,10 +28,10 @@ class WebRTCService {
   String? _currentCallId;
   CallType? _currentCallType;
   String? _receiverId;
-  bool _isInitialized = false;
+  bool _isBasicInitialized = false; // Only basic web requirements checked
   Timer? _callTimeout;
 
-  // STUN servers configuration - Added more reliable servers
+  // STUN servers configuration
   final Map<String, dynamic> _iceServers = {
     'iceServers': [
       {'urls': 'stun:stun.l.google.com:19302'},
@@ -52,48 +51,163 @@ class WebRTCService {
     ],
   };
 
+  /// Basic initialization - only checks web requirements, no permissions
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isBasicInitialized) return;
 
     try {
-      // Request permissions first
-      await _requestPermissions();
-      _isInitialized = true;
-      print('WebRTC service initialized successfully');
+      // Only check web requirements, no permission requests
+      await _checkWebRequirements();
+      _isBasicInitialized = true;
+      print('WebRTC service basic initialization completed');
     } catch (e) {
-      print('WebRTC initialization error: $e');
+      print('WebRTC basic initialization error: $e');
       throw Exception('Failed to initialize WebRTC: $e');
     }
   }
 
+  Future<void> _checkWebRequirements() async {
+    // Check if we're running on web and if HTTPS is required
+    try {
+      // Check if getUserMedia is available
+      if (!WebRTC.platformIsWeb) {
+        return; // Not web, skip web-specific checks
+      }
+
+      // For web, check if we're in a secure context (HTTPS or localhost)
+      final isSecureContext =
+          Uri.base.scheme == 'https' ||
+          Uri.base.host == 'localhost' ||
+          Uri.base.host == '127.0.0.1';
+
+      if (!isSecureContext) {
+        throw Exception(
+          'WebRTC requires HTTPS in production. Please serve your app over HTTPS or use localhost for development.',
+        );
+      }
+
+      print('Web requirements check passed');
+    } catch (e) {
+      print('Web requirements check failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Full initialization with permission checks - called when making/receiving calls
+  Future<void> _initializeWithPermissions() async {
+    // First ensure basic initialization is done
+    await initialize();
+
+    // Now request permissions
+    await _requestPermissions();
+    print('WebRTC service fully initialized with permissions');
+  }
+
   Future<void> _requestPermissions() async {
     try {
-      // Request camera and microphone permissions
-      final stream = await navigator.mediaDevices.getUserMedia({
-        'audio': true,
-        'video': true,
-      });
+      // First, check if devices are available
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      print('Available devices: ${devices.length}');
 
-      // Stop the stream immediately as we just needed permission
-      for (var track in stream.getTracks()) {
-        track.stop();
+      bool hasAudio = false;
+      bool hasVideo = false;
+
+      for (var device in devices) {
+        if (device.kind == 'audioinput') {
+          hasAudio = true;
+        } else if (device.kind == 'videoinput') {
+          hasVideo = true;
+        }
       }
-      print('Media permissions granted');
-    } catch (e) {
-      print('Permission request error: $e');
-      // Try audio only
+
+      print('Has audio device: $hasAudio, Has video device: $hasVideo');
+
+      if (!hasAudio) {
+        throw Exception(
+          'No microphone found. Please connect a microphone and try again.',
+        );
+      }
+
+      // Try to get audio first (more likely to succeed)
+      MediaStream? stream;
       try {
-        final audioStream = await navigator.mediaDevices.getUserMedia({
-          'audio': true,
+        print('Requesting audio permission...');
+        stream = await navigator.mediaDevices.getUserMedia({
+          'audio': {
+            'echoCancellation': true,
+            'noiseSuppression': true,
+            'autoGainControl': true,
+          },
           'video': false,
         });
-        for (var track in audioStream.getTracks()) {
+
+        print('Audio permission granted');
+
+        // If we have video devices and audio worked, try video
+        if (hasVideo) {
+          try {
+            print('Requesting video permission...');
+            final videoStream = await navigator.mediaDevices.getUserMedia({
+              'audio': {
+                'echoCancellation': true,
+                'noiseSuppression': true,
+                'autoGainControl': true,
+              },
+              'video': {
+                'width': {'ideal': 640},
+                'height': {'ideal': 480},
+                'frameRate': {'ideal': 30},
+                'facingMode': 'user',
+              },
+            });
+
+            // Stop the audio-only stream
+            for (var track in stream.getTracks()) {
+              track.stop();
+            }
+
+            // Use the video stream instead
+            stream = videoStream;
+            print('Video permission also granted');
+          } catch (videoError) {
+            print('Video permission denied or failed: $videoError');
+            // Keep the audio stream, video will be disabled
+          }
+        }
+
+        // Stop the permission test stream
+        for (var track in stream!.getTracks()) {
           track.stop();
         }
-        print('Audio permission granted');
-      } catch (audioError) {
-        throw Exception('Microphone permission required: $audioError');
+      } catch (e) {
+        print('Permission request error: $e');
+
+        // More specific error messages for common issues
+        final errorString = e.toString().toLowerCase();
+        if (errorString.contains('notfound')) {
+          throw Exception(
+            'No microphone found. Please connect a microphone and refresh the page.',
+          );
+        } else if (errorString.contains('notallowed') ||
+            errorString.contains('permission')) {
+          throw Exception(
+            'Microphone access denied. Please allow microphone access and refresh the page.',
+          );
+        } else if (errorString.contains('notreadable')) {
+          throw Exception(
+            'Microphone is being used by another application. Please close other applications and try again.',
+          );
+        } else if (errorString.contains('overconstrained')) {
+          throw Exception(
+            'Microphone constraints could not be satisfied. Please try with different settings.',
+          );
+        } else {
+          throw Exception('Failed to access microphone: ${e.toString()}');
+        }
       }
+    } catch (e) {
+      print('Permission request failed: $e');
+      rethrow;
     }
   }
 
@@ -103,7 +217,9 @@ class WebRTCService {
   }) async {
     try {
       print('Starting call to $receiverId, type: $callType');
-      await initialize();
+
+      // Initialize with permissions - this will now check for microphone
+      await _initializeWithPermissions();
 
       _currentCallType = callType;
       _currentCallId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -123,14 +239,14 @@ class WebRTCService {
       // Create peer connection first
       await _createPeerConnection();
 
-      // Get user media
-      await _getUserMedia(callType);
+      // Get user media with fallback
+      await _getUserMediaWithFallback(callType);
 
       // Create offer
       print('Creating offer...');
       final offer = await _peerConnection!.createOffer({
         'offerToReceiveAudio': true,
-        'offerToReceiveVideo': callType == CallType.video,
+        'offerToReceiveVideo': callType == CallType.video && _hasVideoTrack(),
       });
 
       await _peerConnection!.setLocalDescription(offer);
@@ -142,7 +258,7 @@ class WebRTCService {
         callId: _currentCallId!,
         type: 'offer',
         data: offer.toMap(),
-        callType: callType,
+        callType: _currentCallType!, // Use the potentially updated call type
       );
 
       print('Call offer sent successfully');
@@ -150,7 +266,7 @@ class WebRTCService {
       print('Start call error: $e');
       _callStatusController.add(CallStatus.failed);
       await endCall();
-      throw Exception('Failed to start call: $e');
+      rethrow; // Re-throw to show user-friendly error
     }
   }
 
@@ -162,7 +278,9 @@ class WebRTCService {
   }) async {
     try {
       print('Answering call $callId from $callerId');
-      await initialize();
+
+      // Initialize with permissions - this will now check for microphone
+      await _initializeWithPermissions();
 
       _currentCallId = callId;
       _currentCallType = callType;
@@ -174,8 +292,8 @@ class WebRTCService {
       // Create peer connection
       await _createPeerConnection();
 
-      // Get user media
-      await _getUserMedia(callType);
+      // Get user media with fallback
+      await _getUserMediaWithFallback(callType);
 
       // Set remote description (offer)
       print('Setting remote description...');
@@ -186,7 +304,7 @@ class WebRTCService {
       print('Creating answer...');
       final answer = await _peerConnection!.createAnswer({
         'offerToReceiveAudio': true,
-        'offerToReceiveVideo': callType == CallType.video,
+        'offerToReceiveVideo': callType == CallType.video && _hasVideoTrack(),
       });
 
       await _peerConnection!.setLocalDescription(answer);
@@ -198,7 +316,7 @@ class WebRTCService {
         callId: callId,
         type: 'answer',
         data: answer.toMap(),
-        callType: callType,
+        callType: _currentCallType!, // Use the potentially updated call type
       );
 
       print('Call answered successfully');
@@ -206,8 +324,93 @@ class WebRTCService {
       print('Answer call error: $e');
       _callStatusController.add(CallStatus.failed);
       await endCall();
-      throw Exception('Failed to answer call: $e');
+      rethrow;
     }
+  }
+
+  Future<void> _getUserMediaWithFallback(CallType requestedCallType) async {
+    try {
+      print('Getting user media for call type: $requestedCallType');
+
+      // First, check available devices
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      bool hasAudio = devices.any((d) => d.kind == 'audioinput');
+      bool hasVideo = devices.any((d) => d.kind == 'videoinput');
+
+      if (!hasAudio) {
+        throw Exception('No microphone found');
+      }
+
+      Map<String, dynamic> constraints = {
+        'audio': {
+          'echoCancellation': true,
+          'noiseSuppression': true,
+          'autoGainControl': true,
+        },
+        'video': false,
+      };
+
+      // Try video if requested and available
+      if (requestedCallType == CallType.video && hasVideo) {
+        constraints['video'] = {
+          'width': {'ideal': 640},
+          'height': {'ideal': 480},
+          'frameRate': {'ideal': 30, 'max': 30},
+          'facingMode': 'user',
+        };
+      }
+
+      try {
+        _localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        print(
+          'Media stream obtained: ${_localStream?.getTracks().length} tracks',
+        );
+      } catch (e) {
+        print('Failed to get media with original constraints: $e');
+
+        // Fallback: try audio only
+        if (requestedCallType == CallType.video) {
+          print('Falling back to audio-only call');
+          _currentCallType = CallType.audio;
+
+          try {
+            _localStream = await navigator.mediaDevices.getUserMedia({
+              'audio': {
+                'echoCancellation': true,
+                'noiseSuppression': true,
+                'autoGainControl': true,
+              },
+              'video': false,
+            });
+            print('Audio-only fallback successful');
+          } catch (audioError) {
+            throw Exception('Failed to access microphone: $audioError');
+          }
+        } else {
+          throw Exception('Failed to access microphone: $e');
+        }
+      }
+
+      // Add tracks to peer connection
+      if (_peerConnection != null && _localStream != null) {
+        for (var track in _localStream!.getTracks()) {
+          await _peerConnection!.addTrack(track, _localStream!);
+          print('Added track: ${track.kind} (enabled: ${track.enabled})');
+        }
+      }
+
+      if (_localStream != null) {
+        _localStreamController.add(_localStream!);
+      }
+    } catch (e) {
+      print('Get user media error: $e');
+      rethrow;
+    }
+  }
+
+  bool _hasVideoTrack() {
+    if (_localStream == null) return false;
+    return _localStream!.getVideoTracks().isNotEmpty;
   }
 
   Future<void> handleCallAnswer(Map<String, dynamic> answerData) async {
@@ -421,75 +624,29 @@ class WebRTCService {
     }
   }
 
-  Future<void> _getUserMedia(CallType callType) async {
+  /// Optional: Check if microphone is available without requesting permissions
+  /// This can be used to show UI hints before attempting calls
+  Future<bool> isMicrophoneAvailable() async {
     try {
-      print('Getting user media for call type: $callType');
-
-      final constraints = {
-        'audio': {
-          'echoCancellation': true,
-          'noiseSuppression': true,
-          'autoGainControl': true,
-        },
-        'video': callType == CallType.video
-            ? {
-                'width': {'ideal': 640},
-                'height': {'ideal': 480},
-                'frameRate': {'ideal': 30, 'max': 30},
-                'facingMode': 'user',
-              }
-            : false,
-      };
-
-      _localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      print(
-        'Local stream obtained: ${_localStream?.getTracks().length} tracks',
-      );
-
-      if (_peerConnection != null && _localStream != null) {
-        // Add tracks individually for better compatibility
-        for (var track in _localStream!.getTracks()) {
-          await _peerConnection!.addTrack(track, _localStream!);
-          print('Added track: ${track.kind}');
-        }
-      }
-
-      if (_localStream != null) {
-        _localStreamController.add(_localStream!);
-      }
+      await initialize(); // Only basic initialization
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.any((d) => d.kind == 'audioinput');
     } catch (e) {
-      print('Get user media error: $e');
-      // Try with audio only if video fails
-      if (callType == CallType.video) {
-        try {
-          print('Retrying with audio only...');
-          _localStream = await navigator.mediaDevices.getUserMedia({
-            'audio': {
-              'echoCancellation': true,
-              'noiseSuppression': true,
-              'autoGainControl': true,
-            },
-            'video': false,
-          });
+      print('Error checking microphone availability: $e');
+      return false;
+    }
+  }
 
-          if (_peerConnection != null && _localStream != null) {
-            for (var track in _localStream!.getTracks()) {
-              await _peerConnection!.addTrack(track, _localStream!);
-            }
-          }
-
-          if (_localStream != null) {
-            _localStreamController.add(_localStream!);
-          }
-
-          // Update call type to audio
-          _currentCallType = CallType.audio;
-        } catch (audioError) {
-          throw Exception('Failed to access microphone: $audioError');
-        }
-      } else {
-        throw Exception('Failed to access microphone: $e');
-      }
+  /// Optional: Check if camera is available without requesting permissions
+  /// This can be used to show UI hints before attempting video calls
+  Future<bool> isCameraAvailable() async {
+    try {
+      await initialize(); // Only basic initialization
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.any((d) => d.kind == 'videoinput');
+    } catch (e) {
+      print('Error checking camera availability: $e');
+      return false;
     }
   }
 

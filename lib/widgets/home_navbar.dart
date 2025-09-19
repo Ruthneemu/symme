@@ -13,13 +13,12 @@ class HomeNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return BottomNavigationBar(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: AppColors.surfaceDark,
       currentIndex: currentIndex,
       onTap: onTap,
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: theme.colorScheme.onSurface.withOpacity(0.6),
+      selectedItemColor: AppColors.primaryCyan,
+      unselectedItemColor: AppColors.textSecondary,
       showSelectedLabels: true,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,

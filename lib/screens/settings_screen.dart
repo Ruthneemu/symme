@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:symme/providers/theme_provider.dart';
 import 'package:symme/screens/chat_screen.dart';
 import 'package:symme/screens/qr_code_screen.dart';
 import '../widgets/identity_card.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
 import '../utils/constants.dart';
-import '../main.dart'; // for ThemeProvider
 
 class SettingsScreen extends StatefulWidget {
   final String userPublicId;
@@ -21,7 +21,7 @@ class SettingsScreen extends StatefulWidget {
   });
 
   @override
-  _SettingsScreenState createState() => _SettingsScreenState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
@@ -37,7 +37,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final timer = await StorageService.getDisappearingMessageTimer();
     final autoDelete = await StorageService.getAutoDeleteExpired();
-
     setState(() {
       _disappearingTimer = timer;
       _autoDeleteExpired = autoDelete;
@@ -46,119 +45,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Settings"),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 2,
+        backgroundColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
+        elevation: 1,
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           const SizedBox(height: 12),
           IdentityCard(publicId: widget.userPublicId),
+
+          /// Appearance
           _buildSection(context, 'Appearance', [
             ListTile(
-              leading: const Icon(Icons.dark_mode),
+              leading: Icon(Icons.dark_mode, color: theme.colorScheme.primary),
               title: const Text("Dark Mode"),
               subtitle: Text(
                 themeProvider.themeMode == ThemeMode.dark
                     ? "Enabled"
                     : "Disabled",
+                style: theme.textTheme.bodySmall,
               ),
               trailing: Switch(
                 value: themeProvider.themeMode == ThemeMode.dark,
-                onChanged: (value) {
-                  themeProvider.toggleTheme(value);
-                },
+                onChanged: themeProvider.toggleTheme,
               ),
             ),
           ]),
+
+          /// Privacy & Security
           _buildSection(context, 'Privacy & Security', [
-            const ListTile(
-              leading: Icon(Icons.security),
-              title: Text('End-to-End Encryption'),
-              subtitle: Text('All messages are encrypted'),
-              trailing: Icon(Icons.check_circle, color: Colors.green),
+            ListTile(
+              leading: Icon(Icons.security, color: theme.colorScheme.secondary),
+              title: const Text('End-to-End Encryption'),
+              subtitle: const Text('All messages are encrypted'),
+              trailing: Icon(
+                Icons.check_circle,
+                color: theme.colorScheme.tertiary,
+              ),
             ),
             ListTile(
-              leading: const Icon(Icons.timer),
+              leading: Icon(Icons.timer, color: theme.colorScheme.primary),
               title: const Text('Disappearing Messages'),
               subtitle: Text(_getDisappearingTimerText()),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () => _showDisappearingMessagesDialog(context),
             ),
             ListTile(
-              leading: const Icon(Icons.auto_delete),
+              leading: Icon(
+                Icons.auto_delete,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               title: const Text('Auto-delete Expired'),
               subtitle: const Text('Automatically clean up expired messages'),
               trailing: Switch(
                 value: _autoDeleteExpired,
                 onChanged: (value) async {
-                  setState(() {
-                    _autoDeleteExpired = value;
-                  });
+                  setState(() => _autoDeleteExpired = value);
                   await StorageService.setAutoDeleteExpired(value);
                 },
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.block),
+              leading: Icon(Icons.block, color: theme.colorScheme.error),
               title: const Text('Blocked Contacts'),
               subtitle: const Text('Manage blocked users'),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () => _showBlockedContactsDialog(context),
             ),
           ]),
+
+          /// Identity
           _buildSection(context, 'Identity', [
             ListTile(
-              leading: const Icon(Icons.qr_code),
+              leading: Icon(Icons.qr_code, color: theme.colorScheme.primary),
               title: const Text('Share Secure ID'),
               subtitle: const Text('Share or scan a Secure ID'),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () => _navigateToQrScreen(context),
             ),
             ListTile(
-              leading: const Icon(Icons.refresh),
+              leading: Icon(Icons.refresh, color: theme.colorScheme.secondary),
               title: const Text('Regenerate Secure ID'),
               subtitle: const Text('Generate a new Secure ID'),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () => _showRegenerateIdDialog(context),
             ),
             ListTile(
-              leading: const Icon(Icons.key),
+              leading: Icon(Icons.key, color: theme.colorScheme.tertiary),
               title: const Text('Encryption Keys'),
               subtitle: const Text('Rotate encryption keys'),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () => _showKeyRotationDialog(context),
             ),
           ]),
+
+          /// Application
           _buildSection(context, 'Application', [
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: Icon(
+                Icons.info_outline,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               title: const Text('About'),
-              subtitle: const Text('Version ${AppConstants.appVersion}'),
+              subtitle: Text('Version ${AppConstants.appVersion}'),
               onTap: () => _showAboutDialog(context),
             ),
             ListTile(
-              leading: const Icon(Icons.help_outline),
+              leading: Icon(
+                Icons.help_outline,
+                color: theme.colorScheme.primary,
+              ),
               title: const Text('Help & Support'),
               subtitle: const Text('Get help using SecureChat'),
-              trailing: const Icon(Icons.arrow_forward_ios),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () => _showHelpDialog(context),
             ),
             ListTile(
-              leading: const Icon(Icons.cleaning_services),
+              leading: Icon(
+                Icons.cleaning_services,
+                color: theme.colorScheme.secondary,
+              ),
               title: const Text('Clear Messages'),
               subtitle: const Text('Delete all messages (keep contacts)'),
               onTap: () => _showClearMessagesDialog(context),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              leading: Icon(
+                Icons.delete_forever,
+                color: theme.colorScheme.error,
+              ),
               title: const Text('Clear All Data'),
               subtitle: const Text('Delete all messages and contacts'),
               onTap: () => _showClearDataDialog(context),
@@ -174,6 +215,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String title,
     List<Widget> children,
   ) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -181,8 +224,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.primary,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -192,7 +235,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 2,
+          elevation: 1,
+          color: theme.colorScheme.surface,
           child: Column(children: children),
         ),
       ],

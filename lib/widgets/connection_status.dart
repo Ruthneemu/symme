@@ -17,7 +17,8 @@ class ConnectionStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final bool isConnected = connectionStatus.toLowerCase() == 'connected';
+
     return Row(
       children: [
         Container(
@@ -25,17 +26,17 @@ class ConnectionStatus extends StatelessWidget {
           height: 10,
           margin: const EdgeInsets.only(right: 6),
           decoration: BoxDecoration(
-            color: connectionStatus == 'Connected'
-                ? AppColors.success
-                : AppColors.accent,
+            color: isConnected ? AppColors.successGreen : AppColors.errorRed,
             shape: BoxShape.circle,
           ),
         ),
-        Text(connectionStatus,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          connectionStatus,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        ),
         PopupMenuButton<String>(
-          color: theme.colorScheme.surface,
+          color: AppColors.surfaceCard,
+          icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
           onSelected: (value) {
             switch (value) {
               case 'refresh':
@@ -49,12 +50,30 @@ class ConnectionStatus extends StatelessWidget {
                 break;
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'refresh', child: Text("Refresh")),
-            const PopupMenuItem(value: 'regenerate_id', child: Text("Regenerate ID")),
-            const PopupMenuItem(value: 'cleanup', child: Text("Clean Messages")),
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: 'refresh',
+              child: Text(
+                "Refresh",
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'regenerate_id',
+              child: Text(
+                "Regenerate ID",
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'cleanup',
+              child: Text(
+                "Clean Messages",
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+            ),
           ],
-        )
+        ),
       ],
     );
   }

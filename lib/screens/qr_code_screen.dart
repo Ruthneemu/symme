@@ -3,19 +3,13 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class QrCodeScreen extends StatefulWidget {
-  // If you provide a publicId, it will be displayed.
   final String? publicId;
-  // If true, the screen will open directly in scanning mode.
   final bool startInScanMode;
 
-  const QrCodeScreen({
-    super.key,
-    this.publicId,
-    this.startInScanMode = false,
-  });
+  const QrCodeScreen({super.key, this.publicId, this.startInScanMode = false});
 
   @override
-  _QrCodeScreenState createState() => _QrCodeScreenState();
+  State<QrCodeScreen> createState() => _QrCodeScreenState();
 }
 
 class _QrCodeScreenState extends State<QrCodeScreen> {
@@ -24,7 +18,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   @override
   void initState() {
     super.initState();
-    // If publicId is null, we MUST be scanning.
     _isScanning = widget.startInScanMode || widget.publicId == null;
   }
 
@@ -34,32 +27,37 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       appBar: AppBar(
         title: Text(_isScanning ? 'Scan QR Code' : 'My Secure ID'),
       ),
-      body: _isScanning ? _buildScanner() : _buildQrCodeDisplay(),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _isScanning ? _buildScanner() : _buildQrDisplay(),
+      ),
     );
   }
 
-  Widget _buildQrCodeDisplay() {
+  Widget _buildQrDisplay() {
     final theme = Theme.of(context);
+    final id = widget.publicId;
 
-    if (widget.publicId == null) {
+    if (id == null) {
       return Center(
         child: Text(
           'No Secure ID to display.',
-          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             'Share this Secure ID',
-            style: TextStyle(
+            style: theme.textTheme.headlineSmall?.copyWith(
               color: theme.colorScheme.primary,
-              fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -67,21 +65,27 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(2, 4),
+                ),
+              ],
             ),
             child: QrImageView(
-              data: widget.publicId!,
+              data: id,
               version: QrVersions.auto,
-              size: 250.0,
+              size: 250,
+              foregroundColor: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 24),
-          Text(
-            widget.publicId!,
-            style: TextStyle(
-              color: theme.colorScheme.onSurface,
-              fontSize: 18,
+          SelectableText(
+            id,
+            style: theme.textTheme.bodyLarge?.copyWith(
               fontFamily: 'monospace',
               fontWeight: FontWeight.bold,
             ),
@@ -99,18 +103,13 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
 
   Widget _buildScanner() {
     final theme = Theme.of(context);
+
     return Stack(
       children: [
         MobileScanner(
           onDetect: (capture) {
-            final List<Barcode> barcodes = capture.barcodes;
-            if (barcodes.isNotEmpty) {
-              final String? code = barcodes.first.rawValue;
-              if (code != null) {
-                // Pop with the scanned code as the result
-                Navigator.of(context).pop(code);
-              }
-            }
+            final code = capture.barcodes.firstOrNull?.rawValue;
+            if (code != null) Navigator.of(context).pop(code);
           },
         ),
         Center(
@@ -123,7 +122,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ),
           ),
         ),
-        // If we didn't start in scan mode, show a button to go back to display mode.
         if (!widget.startInScanMode && widget.publicId != null)
           Positioned(
             top: 16,

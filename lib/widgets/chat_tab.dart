@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:symme/utils/colors.dart';
 import '../services/firebase_message_service.dart';
 import '../utils/helpers.dart';
 
@@ -33,7 +32,6 @@ class _ChatTabState extends State<ChatTab> {
         }
       },
       onError: (error) {
-        print('Error loading chat rooms: $error');
         if (mounted) {
           setState(() => _isLoading = false);
           Helpers.showSnackBar(context, 'Failed to load chats: $error');
@@ -44,66 +42,73 @@ class _ChatTabState extends State<ChatTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: theme.colorScheme.background,
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+          ? Center(
+              child: CircularProgressIndicator(
+                color: theme.colorScheme.primary,
+              ),
             )
           : _chatRooms.isEmpty
-              ? _buildEmptyState()
-              : _buildChatList(),
+          ? _buildEmptyState(theme)
+          : _buildChatList(theme),
       floatingActionButton: FloatingActionButton(
         onPressed: _showStartChatDialog,
-        backgroundColor: AppColors.primary,
+        backgroundColor: theme.colorScheme.primary,
         tooltip: 'Start New Chat',
         child: const Icon(Icons.add_comment, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return const Center(
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.chat_bubble_outline_rounded,
             size: 80,
-            color: AppColors.greyDark,
+            color: theme.colorScheme.onSurface.withOpacity(0.4),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'No Chats Yet',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: AppColors.greyLight,
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'Tap the button below to start a new conversation.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: AppColors.greyDark),
+            style: TextStyle(
+              fontSize: 16,
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildChatList() {
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80), // Space for the FAB
+  Widget _buildChatList(ThemeData theme) {
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 80),
       itemCount: _chatRooms.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 4),
       itemBuilder: (context, index) {
-        final chatRoom = _chatRooms[index];
-        return _buildChatRoomItem(chatRoom);
+        return _buildChatRoomItem(_chatRooms[index], theme);
       },
     );
   }
 
-  Widget _buildChatRoomItem(Map<String, dynamic> chatRoom) {
+  Widget _buildChatRoomItem(Map<String, dynamic> chatRoom, ThemeData theme) {
     final otherUserSecureId = chatRoom['otherUserSecureId'] as String? ?? '';
     final displayName = chatRoom['displayName'] as String? ?? otherUserSecureId;
     final lastMessage = chatRoom['lastMessage'] as String? ?? 'No messages yet';
@@ -123,26 +128,27 @@ class _ChatTabState extends State<ChatTab> {
       } else if (difference.inMinutes > 0) {
         timeString = '${difference.inMinutes}m ago';
       } else {
-        timeString = 'Just now';
+        timeString = 'Now';
       }
     }
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: AppColors.backgroundLight,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: theme.colorScheme.surface,
+      elevation: 2,
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: Stack(
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: AppColors.secondary.withOpacity(0.2),
+              backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
               child: Text(
                 displayName.isNotEmpty
                     ? displayName.substring(0, 2).toUpperCase()
                     : 'U',
-                style: const TextStyle(
-                  color: AppColors.secondary,
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -156,10 +162,10 @@ class _ChatTabState extends State<ChatTab> {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: AppColors.success,
+                    color: theme.colorScheme.secondary,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.backgroundLight,
+                      color: theme.colorScheme.surface,
                       width: 2,
                     ),
                   ),
@@ -169,8 +175,8 @@ class _ChatTabState extends State<ChatTab> {
         ),
         title: Text(
           displayName,
-          style: const TextStyle(
-            color: AppColors.primary,
+          style: TextStyle(
+            color: theme.colorScheme.primary,
             fontWeight: FontWeight.bold,
             fontSize: 16,
             fontFamily: 'monospace',
@@ -184,7 +190,10 @@ class _ChatTabState extends State<ChatTab> {
             const SizedBox(height: 4),
             Text(
               lastMessage,
-              style: const TextStyle(color: AppColors.greyLight, fontSize: 14),
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 14,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -192,12 +201,18 @@ class _ChatTabState extends State<ChatTab> {
               const SizedBox(height: 4),
               Text(
                 timeString,
-                style: const TextStyle(color: AppColors.greyDark, fontSize: 12),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 12,
+                ),
               ),
             ],
           ],
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.greyDark),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: theme.colorScheme.onSurface.withOpacity(0.4),
+        ),
         onTap: () {
           if (otherUserSecureId.isNotEmpty) {
             widget.onStartChat(otherUserSecureId);
@@ -210,52 +225,65 @@ class _ChatTabState extends State<ChatTab> {
 
   void _showStartChatDialog() {
     final TextEditingController controller = TextEditingController();
+    final theme = Theme.of(context);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundLight,
-        title: const Text(
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(
           'Start New Chat',
-          style: TextStyle(color: AppColors.primary),
+          style: TextStyle(color: theme.colorScheme.primary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Enter the secure ID of the person you want to chat with:',
-              style: TextStyle(color: AppColors.greyLight),
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              style: const TextStyle(
-                color: AppColors.greyLight,
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
                 fontFamily: 'monospace',
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'e.g., ABC123XYZ789',
-                hintStyle: TextStyle(color: AppColors.greyDark),
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person_add, color: AppColors.accent),
+                hintStyle: TextStyle(
+                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                ),
+                border: const OutlineInputBorder(),
+                prefixIcon: Icon(
+                  Icons.person_add,
+                  color: theme.colorScheme.primary,
+                ),
               ),
               textCapitalization: TextCapitalization.characters,
               maxLength: 12,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Secure IDs are 12 characters long and contain only letters and numbers.',
-              style: TextStyle(color: AppColors.greyDark, fontSize: 12),
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.greyDark),
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ),
           ElevatedButton(
@@ -272,7 +300,7 @@ class _ChatTabState extends State<ChatTab> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: theme.colorScheme.primary,
               foregroundColor: Colors.white,
             ),
             child: const Text('Start Chat'),
@@ -287,67 +315,35 @@ class _ChatTabState extends State<ChatTab> {
   }
 
   void _showChatOptions(Map<String, dynamic> chatRoom) {
-    final otherUserSecureId = chatRoom['otherUserSecureId'] as String? ?? '';
-    final displayName = chatRoom['displayName'] as String? ?? otherUserSecureId;
+    final theme = Theme.of(context);
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppColors.secondary.withOpacity(0.2),
-                    child: Text(
-                      displayName.isNotEmpty
-                          ? displayName.substring(0, 2).toUpperCase()
-                          : 'U',
-                      style: const TextStyle(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Chat Options',
-                          style: TextStyle(
-                            color: AppColors.greyLight,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Divider(color: AppColors.greyDark),
             ListTile(
-              leading: const Icon(Icons.info_outline, color: AppColors.accent),
-              title: const Text(
+              leading: Icon(
+                Icons.info_outline,
+                color: theme.colorScheme.primary,
+              ),
+              title: Text(
                 'Chat Info',
-                style: TextStyle(color: AppColors.greyLight),
+                style: TextStyle(color: theme.colorScheme.onSurface),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -355,13 +351,13 @@ class _ChatTabState extends State<ChatTab> {
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.notifications_off_outlined,
-                color: AppColors.neonOrange,
+                color: theme.colorScheme.tertiary,
               ),
-              title: const Text(
+              title: Text(
                 'Mute Notifications',
-                style: TextStyle(color: AppColors.greyLight),
+                style: TextStyle(color: theme.colorScheme.onSurface),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -369,17 +365,20 @@ class _ChatTabState extends State<ChatTab> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.error),
-              title: const Text(
+              leading: Icon(
+                Icons.delete_outline,
+                color: theme.colorScheme.error,
+              ),
+              title: Text(
                 'Clear Chat',
-                style: TextStyle(color: AppColors.greyLight),
+                style: TextStyle(color: theme.colorScheme.onSurface),
               ),
               onTap: () {
                 Navigator.pop(context);
                 _showClearChatDialog(chatRoom);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -387,6 +386,7 @@ class _ChatTabState extends State<ChatTab> {
   }
 
   void _showChatInfo(Map<String, dynamic> chatRoom) {
+    final theme = Theme.of(context);
     final otherUserSecureId = chatRoom['otherUserSecureId'] as String? ?? '';
     final displayName = chatRoom['displayName'] as String? ?? otherUserSecureId;
     final isOnline = chatRoom['isOnline'] as bool? ?? false;
@@ -417,10 +417,10 @@ class _ChatTabState extends State<ChatTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundLight,
-        title: const Text(
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(
           'Chat Information',
-          style: TextStyle(color: AppColors.primary),
+          style: TextStyle(color: theme.colorScheme.primary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -429,13 +429,13 @@ class _ChatTabState extends State<ChatTab> {
             Center(
               child: CircleAvatar(
                 radius: 40,
-                backgroundColor: AppColors.secondary.withOpacity(0.2),
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
                 child: Text(
                   displayName.isNotEmpty
                       ? displayName.substring(0, 2).toUpperCase()
                       : 'U',
-                  style: const TextStyle(
-                    color: AppColors.secondary,
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
                     fontSize: 24,
                   ),
@@ -443,19 +443,19 @@ class _ChatTabState extends State<ChatTab> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildInfoRow('Secure ID:', displayName),
+            _buildInfoRow('Secure ID:', displayName, theme),
             const SizedBox(height: 8),
-            _buildInfoRow('Status:', lastSeenText),
+            _buildInfoRow('Status:', lastSeenText, theme),
             const SizedBox(height: 8),
-            _buildInfoRow('Encryption:', 'End-to-end encrypted'),
+            _buildInfoRow('Encryption:', 'End-to-end encrypted', theme),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Close',
-              style: TextStyle(color: AppColors.primary),
+              style: TextStyle(color: theme.colorScheme.primary),
             ),
           ),
         ],
@@ -463,7 +463,7 @@ class _ChatTabState extends State<ChatTab> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, ThemeData theme) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -471,8 +471,8 @@ class _ChatTabState extends State<ChatTab> {
           width: 80,
           child: Text(
             label,
-            style: const TextStyle(
-              color: AppColors.greyDark,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -481,8 +481,8 @@ class _ChatTabState extends State<ChatTab> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: AppColors.greyLight,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
               fontSize: 14,
               fontFamily: 'monospace',
             ),
@@ -493,31 +493,34 @@ class _ChatTabState extends State<ChatTab> {
   }
 
   void _showClearChatDialog(Map<String, dynamic> chatRoom) {
+    final theme = Theme.of(context);
     final displayName = chatRoom['displayName'] as String? ?? 'Unknown';
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundLight,
-        title: const Text(
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(
           'Clear Chat',
-          style: TextStyle(color: AppColors.error),
+          style: TextStyle(color: theme.colorScheme.error),
         ),
         content: Text(
           'Are you sure you want to clear all messages with $displayName? This action cannot be undone.',
-          style: const TextStyle(color: AppColors.greyLight),
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.greyDark),
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
+              backgroundColor: theme.colorScheme.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
@@ -538,7 +541,7 @@ class _ChatTabState extends State<ChatTab> {
         final success = await FirebaseMessageService.clearChat(otherUserId);
         if (success) {
           Helpers.showSnackBar(context, 'Chat cleared successfully');
-          _loadChatRooms(); // Refresh the list
+          _loadChatRooms();
         } else {
           Helpers.showSnackBar(context, 'Failed to clear chat');
         }
